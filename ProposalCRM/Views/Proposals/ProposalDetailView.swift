@@ -1,11 +1,12 @@
 // ProposalDetailView.swift
-// Main view for displaying proposal details
+// Main view for displaying proposal details with enhanced attachment and drawing features
 
 import SwiftUI
 import CoreData
 import PDFKit
 import UIKit
 import MessageUI
+import PencilKit
 
 struct ProposalDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -45,7 +46,7 @@ struct ProposalDetailView: View {
     var body: some View {
         ZStack {
             Color(UIColor.systemBackground)
-                            .edgesIgnoringSafeArea(.all)
+                .edgesIgnoringSafeArea(.all)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -108,6 +109,12 @@ struct ProposalDetailView: View {
                                     deleteTax(tax)
                                 }
                             )
+                            
+                            // NEW: Add Attachments Section
+                            AttachmentsSection(proposal: proposal)
+                            
+                            // NEW: Add Drawing Notes Section
+                            DrawingNotesSection(proposal: proposal)
                             
                             FinancialSummarySection(proposal: proposal) {
                                 showingFinancialDetails = true
@@ -194,43 +201,43 @@ struct ProposalDetailView: View {
             }
         }
         .sheet(isPresented: $showEditItemSheet, onDismiss: {
-                    // Reset edit state
-                    itemToEdit = nil
-                    showEditItemSheet = false
-                    
-                    // Force complete view refresh
-                    if didSaveItemChanges {
-                        // Refresh the context to ensure all relationships are fully loaded
-                        viewContext.refreshAllObjects()
+            // Reset edit state
+            itemToEdit = nil
+            showEditItemSheet = false
+            
+            // Force complete view refresh
+            if didSaveItemChanges {
+                // Refresh the context to ensure all relationships are fully loaded
+                viewContext.refreshAllObjects()
+                
+                // Update the UI
+                refreshId = UUID()
+                didSaveItemChanges = false
+            }
+        }) {
+            if let item = itemToEdit {
+                ProposalItemEditorWrapper(
+                    item: item,
+                    didSave: $didSaveItemChanges,
+                    onSave: {
+                        // Save the context explicitly to ensure all changes are persisted
+                        do {
+                            try viewContext.save()
+                        } catch {
+                            print("Error saving context: \(error)")
+                        }
                         
-                        // Update the UI
-                        refreshId = UUID()
-                        didSaveItemChanges = false
+                        // Force view refresh
+                        DispatchQueue.main.async {
+                            // Refresh all objects to ensure latest data
+                            viewContext.refreshAllObjects()
+                            refreshId = UUID()
+                        }
                     }
-                }) {
-                    if let item = itemToEdit {
-                        ProposalItemEditorWrapper(
-                            item: item,
-                            didSave: $didSaveItemChanges,
-                            onSave: {
-                                // Save the context explicitly to ensure all changes are persisted
-                                do {
-                                    try viewContext.save()
-                                } catch {
-                                    print("Error saving context: \(error)")
-                                }
-                                
-                                // Force view refresh
-                                DispatchQueue.main.async {
-                                    // Refresh all objects to ensure latest data
-                                    viewContext.refreshAllObjects()
-                                    refreshId = UUID()
-                                }
-                            }
-                        )
-                        .environment(\.managedObjectContext, viewContext)
-                    }
-                }
+                )
+                .environment(\.managedObjectContext, viewContext)
+            }
+        }
         .alert("Delete Item?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 if let item = itemToDelete {
