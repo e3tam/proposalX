@@ -1,251 +1,301 @@
-// ProductTableView.swift
-// Table view for displaying proposal products with pricing information
-
 import SwiftUI
-import CoreData
 
 struct ProductTableView: View {
     @ObservedObject var proposal: Proposal
-    var onDelete: (ProposalItem) -> Void
-    var onEdit: (ProposalItem) -> Void
+    let onDelete: (ProposalItem) -> Void
+    let onEdit: (ProposalItem) -> Void
     @Environment(\.colorScheme) var colorScheme
+    
+    // Color properties
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.1) : Color(UIColor.tertiarySystemBackground)
+    }
+    
+    private var headerBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.3) : Color(UIColor.secondarySystemBackground)
+    }
+    
+    private var rowBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.2) : Color(UIColor.systemBackground)
+    }
+    
+    private var primaryTextColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Table header
-            productTableHeader()
+            // Preserve the original scrollable header
+            ScrollView(.horizontal, showsIndicators: true) {
+                HStack(spacing: 0) {
+                    // Fixed columns
+                    Group {
+                        Text("Product Name")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 150, alignment: .leading)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Qty")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 40, alignment: .center)
+                        
+                        Divider().frame(height: 30)
+                    }
+                    
+                    // Scrollable columns
+                    Group {
+                        Text("Unit Partner Price")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Unit List Price")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Multiplier")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 80, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Discount")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 80, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Ext Partner Price")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Ext List Price")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Ext Customer Price")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 120, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Total Profit")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.horizontal, 5)
+                        
+                        Divider().frame(height: 30)
+                        
+                        Text("Custom Tax?")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .frame(width: 90, alignment: .center)
+                            .padding(.horizontal, 5)
+                    }
+                    
+                    // Add Actions header with same spacing as in rows
+                    Divider().frame(height: 30)
+                    
+                    Text("Actions")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 100, alignment: .center)
+                        .padding(.horizontal, 5)
+                }
+                .padding(.vertical, 5)
+                .background(headerBackgroundColor)
+                .cornerRadius(6)
+            }
             
+            // Content section
             if proposal.itemsArray.isEmpty {
-                emptyProductsView()
+                Text("No products added yet")
+                    .foregroundColor(.secondary)
+                    .padding()
+                    .frame(maxWidth: .infinity)
             } else {
-                // Table content
+                // Row content using a row-level ZStack approach to keep actions visible
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(proposal.itemsArray, id: \.self) { item in
-                            ProductTableRow(item: item, onEdit: onEdit, onDelete: onDelete)
-                            Divider().background(Color.gray.opacity(0.3))
+                            ZStack {
+                                // Main row in ScrollView
+                                ScrollView(.horizontal, showsIndicators: true) {
+                                    HStack(spacing: 0) {
+                                        // Fixed columns
+                                        Group {
+                                            Text(item.productName)
+                                                .font(.system(size: 14))
+                                                .frame(width: 150, alignment: .leading)
+                                                .padding(.horizontal, 5)
+                                                .lineLimit(1)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            Text("\(Int(item.quantity))")
+                                                .font(.system(size: 14))
+                                                .frame(width: 40, alignment: .center)
+                                            
+                                            Divider().frame(height: 30)
+                                        }
+                                        
+                                        // Calculated columns
+                                        Group {
+                                            // Unit partner price
+                                            let unitPartnerPrice = item.product?.partnerPrice ?? 0
+                                            Text(Formatters.formatEuro(unitPartnerPrice))
+                                                .font(.system(size: 14))
+                                                .frame(width: 100, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Unit list price
+                                            let unitListPrice = item.product?.listPrice ?? 0
+                                            Text(Formatters.formatEuro(unitListPrice))
+                                                .font(.system(size: 14))
+                                                .frame(width: 100, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Multiplier
+                                            let estimatedMultiplier = unitListPrice > 0 ?
+                                                (item.unitPrice / unitListPrice) * (1 + item.discount/100) : 1.0
+                                            Text(String(format: "%.2f", estimatedMultiplier))
+                                                .font(.system(size: 14))
+                                                .frame(width: 80, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Discount
+                                            Text(String(format: "%.1f%%", item.discount))
+                                                .font(.system(size: 14))
+                                                .frame(width: 80, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Extended partner price
+                                            let extPartnerPrice = unitPartnerPrice * item.quantity
+                                            Text(Formatters.formatEuro(extPartnerPrice))
+                                                .font(.system(size: 14))
+                                                .frame(width: 100, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Extended list price
+                                            let extListPrice = unitListPrice * item.quantity
+                                            Text(Formatters.formatEuro(extListPrice))
+                                                .font(.system(size: 14))
+                                                .frame(width: 100, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Extended customer price
+                                            let extCustomerPrice = item.amount
+                                            Text(Formatters.formatEuro(extCustomerPrice))
+                                                .font(.system(size: 14))
+                                                .frame(width: 120, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Total profit
+                                            let totalProfit = extCustomerPrice - extPartnerPrice
+                                            Text(Formatters.formatEuro(totalProfit))
+                                                .font(.system(size: 14))
+                                                .frame(width: 100, alignment: .trailing)
+                                                .padding(.horizontal, 5)
+                                                .foregroundColor(totalProfit >= 0 ? .green : .red)
+                                            
+                                            Divider().frame(height: 30)
+                                            
+                                            // Custom tax
+                                            Text(item.applyCustomTax ? "Yes" : "No")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(item.applyCustomTax ? .green : .gray)
+                                                .frame(width: 90, alignment: .center)
+                                                .padding(.horizontal, 5)
+                                        }
+                                        
+                                        // Placeholder for action buttons width
+                                        Divider().frame(height: 30)
+                                        Spacer().frame(width: 100)
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                                
+                                // Action buttons positioned at the end of the row
+                                HStack {
+                                    Spacer()
+                                    
+                                    // Action buttons - always visible
+                                    HStack(spacing: 15) {
+                                        Button(action: { onEdit(item) }) {
+                                            Image(systemName: "pencil")
+                                                .foregroundColor(.blue)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        
+                                        Button(action: { onDelete(item) }) {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                    .frame(width: 100, alignment: .center)
+                                    .padding(.horizontal, 5)
+                                    .background(
+                                        // Background to ensure visibility
+                                        rowBackgroundColor
+                                    )
+                                }
+                            }
+                            .background(rowBackgroundColor)
+                            
+                            Divider()
+                                .background(Color.gray.opacity(0.5))
                         }
                     }
                 }
-                .background(Color.black.opacity(0.1))
-                
-                // Totals row
-                totalRow()
+                .frame(height: min(CGFloat(proposal.itemsArray.count) * 50, 400))
             }
         }
-        .background(Color.black.opacity(0.15))
+        .background(backgroundColor)
         .cornerRadius(10)
-    }
-    
-    private func taxDetails(for item: ProposalItem) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if item.applyCustomTax {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.system(size: 12))
-                    Text("Custom tax applied")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-                
-                if let product = item.product {
-                    Text("Tax base: \(Formatters.formatEuro(product.partnerPrice * item.quantity))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else {
-                HStack {
-                    Image(systemName: "xmark.circle")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 12))
-                    Text("No custom tax")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-    }
-    private func productTableHeader() -> some View {
-        HStack(spacing: 0) {
-            Text("Product Name")
-                .frame(width: 200, alignment: .leading)
-                .padding(.leading, 8)
-            
-            Divider().frame(height: 30)
-            
-            Text("Qty")
-                .frame(width: 60, alignment: .center)
-            
-            Divider().frame(height: 30)
-            
-            Text("Unit Partner Price")
-                .frame(width: 120, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Unit List Price")
-                .frame(width: 120, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Multiplier")
-                .frame(width: 80, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Discount")
-                .frame(width: 80, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Ext Partner Price")
-                .frame(width: 120, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Ext List Price")
-                .frame(width: 120, alignment: .trailing)
-            
-            Divider().frame(height: 30)
-            
-            Text("Ext Customer")
-                .frame(width: 120, alignment: .trailing)
-                .padding(.trailing, 8)
-        }
-        .font(.caption)
-        .fontWeight(.bold)
-        .foregroundColor(.white)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.3))
-    }
-    
-    private func emptyProductsView() -> some View {
-        Text("No products added yet")
-            .foregroundColor(.gray)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color.black.opacity(0.1))
-    }
-    
-    private func totalRow() -> some View {
-        HStack(spacing: 0) {
-            Text("Total Products")
-                .fontWeight(.bold)
-                .frame(width: 680, alignment: .trailing)
-                .padding(.leading, 8)
-            
-            Divider().frame(height: 30)
-            
-            Text(Formatters.formatEuro(proposal.subtotalProducts))
-                .fontWeight(.bold)
-                .frame(width: 120, alignment: .trailing)
-                .padding(.trailing, 8)
-        }
-        .foregroundColor(.white)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.4))
-    }
-}
-
-struct ProductTableRow: View {
-    @ObservedObject var item: ProposalItem
-    var onEdit: (ProposalItem) -> Void
-    var onDelete: (ProposalItem) -> Void
-    
-    var body: some View {
-        Button(action: { onEdit(item) }) {
-            HStack(spacing: 0) {
-                // Product Name
-                Text(item.product?.name ?? "Unknown Product")
-                    .lineLimit(2)
-                    .font(.system(size: 14))
-                    .frame(width: 200, alignment: .leading)
-                    .padding(.leading, 8)
-                
-                Divider().frame(height: 40)
-                
-                // Quantity
-                Text("\(Int(item.quantity))")
-                    .font(.system(size: 14))
-                    .frame(width: 60, alignment: .center)
-                
-                Divider().frame(height: 40)
-                
-                // Unit Partner Price
-                Text(item.product != nil ? Formatters.formatEuro(item.product!.partnerPrice) : "-")
-                    .font(.system(size: 14))
-                    .frame(width: 120, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Unit List Price
-                Text(item.product != nil ? Formatters.formatEuro(item.product!.listPrice) : "-")
-                    .font(.system(size: 14))
-                    .frame(width: 120, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Multiplier
-                let multiplier = item.product?.listPrice ?? 0 > 0 ? item.unitPrice / (item.product?.listPrice ?? 1) : 0
-                Text(String(format: "%.2f", multiplier))
-                    .font(.system(size: 14))
-                    .frame(width: 80, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Discount
-                Text("\(String(format: "%.1f", item.discount))%")
-                    .font(.system(size: 14))
-                    .frame(width: 80, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Extended Partner Price
-                let extPartnerPrice = (item.product?.partnerPrice ?? 0) * item.quantity
-                Text(Formatters.formatEuro(extPartnerPrice))
-                    .font(.system(size: 14))
-                    .frame(width: 120, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Extended List Price
-                let extListPrice = (item.product?.listPrice ?? 0) * item.quantity
-                Text(Formatters.formatEuro(extListPrice))
-                    .font(.system(size: 14))
-                    .frame(width: 120, alignment: .trailing)
-                
-                Divider().frame(height: 40)
-                
-                // Extended Customer Price (Amount)
-                Text(Formatters.formatEuro(item.amount))
-                    .font(.system(size: 14))
-                    .frame(width: 100, alignment: .trailing)
-                
-                // Edit/Delete buttons
-                HStack(spacing: 4) {
-                    Button(action: { onEdit(item) }) {
-                        Image(systemName: "pencil")
-                            .foregroundColor(.blue)
-                            .padding(2)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    Button(action: { onDelete(item) }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
-                            .padding(2)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .frame(width: 20, alignment: .center)
-                .padding(.trailing, 8)
-            }
-            .foregroundColor(.white)
-            .padding(.vertical, 4)
-            .background(Color.black.opacity(0.2))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
     }
 }
