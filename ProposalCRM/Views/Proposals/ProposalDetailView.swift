@@ -44,16 +44,18 @@ struct ProposalDetailView: View {
     
     var body: some View {
         ZStack {
-            // Solid background to prevent drawing overlay issues
-            Color.black.edgesIgnoringSafeArea(.all)
+            // Use system background color instead of forcing black
+            Color(UIColor.systemBackground)
+                .edgesIgnoringSafeArea(.all)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Enhanced header section with detailed customer info
+                    // Enhanced header section with detailed customer info - now respects system theme
                     EnhancedProposalHeaderSection(
                         proposal: proposal,
                         onEditTapped: { showingEditProposal = true }
                     )
+                    .environment(\.colorScheme, colorScheme) // Pass system color scheme to the header
                     
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
@@ -360,6 +362,12 @@ struct ProposalDetailView: View {
 // Lightweight previews to avoid build slowdowns
 struct ProposalDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        Text("Preview placeholder")
+        Group {
+            Text("Preview placeholder - Light Mode")
+                .preferredColorScheme(.light)
+            
+            Text("Preview placeholder - Dark Mode")
+                .preferredColorScheme(.dark)
+        }
     }
 }
