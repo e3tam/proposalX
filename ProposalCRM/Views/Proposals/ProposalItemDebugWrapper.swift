@@ -8,46 +8,65 @@
 import SwiftUI
 import CoreData
 
-// This wrapper ensures the item is fully loaded before presenting the edit view
 struct ProposalItemDebugWrapper: View {
     @Environment(\.managedObjectContext) private var viewContext
     let item: ProposalItem
     @Binding var didSave: Bool
     var onSave: () -> Void
+    @State private var isLoading: Bool = true
     
     init(item: ProposalItem, didSave: Binding<Bool>, onSave: @escaping () -> Void) {
         self.item = item
         self._didSave = didSave
         self.onSave = onSave
-        
-        // Pre-load the data in the initializer
-        let context = item.managedObjectContext
-        if let context = context {
-            context.performAndWait {
-                if item.isFault {
-                    context.refresh(item, mergeChanges: true)
-                }
-                
-                if let product = item.product, product.isFault {
-                    context.refresh(product, mergeChanges: true)
-                }
-                
-                // Force load properties
-                _ = item.quantity
-                _ = item.discount
-                _ = item.unitPrice
-                _ = item.product?.name
-                _ = item.product?.listPrice
-                _ = item.product?.partnerPrice
-            }
-        }
+        // No Core Data operations here
     }
     
     var body: some View {
-        EditProposalItemView(
-            item: item,
-            didSave: $didSave,
-            onSave: onSave
-        )
+        Group {
+            if isLoading {
+                ProgressView("Loading item data...")
+            } else {
+                EditProposalItemView(
+                    item: item,
+                    didSave: $didSave,
+                    onSave: onSave
+                )
+            }
+        }
+        .onAppear {
+            loadItemData()
+        }
+    }
+    
+    private func loadItemData() {
+        let context = item.managedObjectContext
+        if let context = context {
+            // Use perform (async) instead of performAndWait
+            context.perform {
+                // Same operations but async
+                if self.item.isFault {
+                    context.refresh(self.item, mergeChanges: true)
+                }
+                
+                if let product = self.item.product, product.isFault {
+                    context.refresh(product, mergeChanges: true)
+                }
+                
+                // Force load properties (if needed)
+                _ = self.item.quantity
+                _ = self.item.discount
+                _ = self.item.unitPrice
+                _ = self.item.product?.name
+                _ = self.item.product?.listPrice
+                _ = self.item.product?.partnerPrice
+                
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                }
+            }
+        } else {
+            isLoading = false
+        }
     }
 }
