@@ -14,6 +14,20 @@ import SwiftUI
 struct EnhancedProposalHeaderSection: View {
     let proposal: Proposal
     let onEditTapped: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    
+    // Dynamic colors based on color scheme
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color(UIColor.systemBackground).opacity(0.2) : Color(UIColor.secondarySystemBackground)
+    }
+    
+    private var primaryTextColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+    
+    private var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
     
     var body: some View {
         VStack(spacing: 20) {
@@ -25,7 +39,7 @@ struct EnhancedProposalHeaderSection: View {
                         Text("Customer Information")
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                         Spacer()
                     }
                     .padding(.horizontal)
@@ -41,7 +55,7 @@ struct EnhancedProposalHeaderSection: View {
                             
                             Text(customer.formattedName)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(primaryTextColor)
                         }
                         
                         // Contact person
@@ -54,7 +68,7 @@ struct EnhancedProposalHeaderSection: View {
                                 
                                 Text(contactName)
                                     .font(.subheadline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(primaryTextColor)
                             }
                         }
                         
@@ -68,7 +82,7 @@ struct EnhancedProposalHeaderSection: View {
                                 
                                 Text(email)
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(secondaryTextColor)
                             }
                         }
                         
@@ -82,7 +96,7 @@ struct EnhancedProposalHeaderSection: View {
                                 
                                 Text(phone)
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(secondaryTextColor)
                             }
                         }
                         
@@ -96,13 +110,13 @@ struct EnhancedProposalHeaderSection: View {
                                 
                                 Text(address)
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(secondaryTextColor)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
                     .padding()
-                    .background(Color.black.opacity(0.2))
+                    .background(backgroundColor)
                     .cornerRadius(10)
                     .padding(.horizontal)
                 }
@@ -115,7 +129,7 @@ struct EnhancedProposalHeaderSection: View {
                     Text("Proposal Information")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
+                        .foregroundColor(primaryTextColor)
                     
                     Spacer()
                     
@@ -132,29 +146,29 @@ struct EnhancedProposalHeaderSection: View {
                     HStack {
                         Text("Proposal #")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(secondaryTextColor)
                         
                         Text(proposal.formattedNumber)
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                     }
                     
                     // Creation date
                     HStack {
                         Text("Date")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(secondaryTextColor)
                         
                         Text(proposal.formattedDate)
                             .font(.subheadline)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                     }
                     
                     // Status
                     HStack {
                         Text("Status")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(secondaryTextColor)
                         
                         Text(proposal.formattedStatus)
                             .font(.subheadline)
@@ -169,24 +183,25 @@ struct EnhancedProposalHeaderSection: View {
                     HStack {
                         Text("Total Amount")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(secondaryTextColor)
                         
                         Text(proposal.formattedTotal)
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                     }
                 }
                 .padding()
-                .background(Color.black.opacity(0.2))
+                .background(backgroundColor)
                 .cornerRadius(10)
                 .padding(.horizontal)
             }
         }
         .padding(.vertical)
-        .background(Color.black)
+        .background(colorScheme == .dark ? Color(UIColor.systemBackground) : Color(UIColor.secondarySystemBackground))
     }
     
+    // Status color remains unchanged
     private func statusColor(for status: String) -> Color {
         switch status {
         case "Draft": return .gray

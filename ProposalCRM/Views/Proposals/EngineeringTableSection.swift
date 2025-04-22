@@ -16,6 +16,27 @@ struct EngineeringTableSection: View {
     let onAdd: () -> Void
     let onEdit: (Engineering) -> Void
     let onDelete: (Engineering) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.1) : Color(UIColor.tertiarySystemBackground)
+    }
+    
+    private var headerBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.3) : Color(UIColor.secondarySystemBackground)
+    }
+    
+    private var rowBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.2) : Color(UIColor.systemBackground)
+    }
+    
+    private var primaryTextColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+    
+    private var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -23,12 +44,12 @@ struct EngineeringTableSection: View {
                 Text("Engineering")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryTextColor)
                 
                 if !proposal.engineeringArray.isEmpty {
                     Text("(\(proposal.engineeringArray.count))")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                 }
                 
                 Spacer()
@@ -51,10 +72,10 @@ struct EngineeringTableSection: View {
     
     private func emptyEngineeringView() -> some View {
         Text("No engineering services added yet")
-            .foregroundColor(.gray)
+            .foregroundColor(secondaryTextColor)
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Color.black.opacity(0.15))
+            .background(backgroundColor)
             .cornerRadius(10)
     }
     
@@ -81,9 +102,9 @@ struct EngineeringTableSection: View {
             }
             .font(.caption)
             .fontWeight(.bold)
-            .foregroundColor(.white)
+            .foregroundColor(primaryTextColor)
             .padding(.vertical, 8)
-            .background(Color.black.opacity(0.3))
+            .background(headerBackgroundColor)
             
             // Engineering rows
             ForEach(proposal.engineeringArray, id: \.self) { engineering in
@@ -122,11 +143,11 @@ struct EngineeringTableSection: View {
                     .frame(width: 100, alignment: .center)
                     .padding(.trailing, 8)
                 }
-                .foregroundColor(.white)
+                .foregroundColor(primaryTextColor)
                 .padding(.vertical, 8)
-                .background(Color.black.opacity(0.2))
+                .background(rowBackgroundColor)
                 
-                Divider().background(Color.gray.opacity(0.3))
+                Divider().background(colorScheme == .dark ? Color.gray.opacity(0.3) : Color.gray.opacity(0.2))
             }
             
             // Total row
@@ -144,11 +165,15 @@ struct EngineeringTableSection: View {
                     .frame(width: 100)
                     .padding(.trailing, 8)
             }
-            .foregroundColor(.white)
+            .foregroundColor(primaryTextColor)
             .padding(.vertical, 8)
-            .background(Color.black.opacity(0.4))
+            .background(headerBackgroundColor)
         }
-        .background(Color.black.opacity(0.15))
+        .background(backgroundColor)
         .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colorScheme == .dark ? Color.gray.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 1)
+        )
     }
 }

@@ -44,89 +44,86 @@ struct ProposalDetailView: View {
     
     var body: some View {
         ZStack {
-            // Use system background color instead of forcing black
             Color(UIColor.systemBackground)
-                .edgesIgnoringSafeArea(.all)
+                            .edgesIgnoringSafeArea(.all)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Enhanced header section with detailed customer info - now respects system theme
+                    // Pass colorScheme to header section
                     EnhancedProposalHeaderSection(
                         proposal: proposal,
                         onEditTapped: { showingEditProposal = true }
                     )
-                    .environment(\.colorScheme, colorScheme) // Pass system color scheme to the header
                     
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
-                        // PRODUCTS SECTION
-                        ProductsTableSection(
-                            proposal: proposal,
-                            onAdd: { showingItemSelection = true },
-                            onEdit: { item in
-                                itemToEdit = item
-                                showEditItemSheet = true
-                            },
-                            onDelete: { item in
-                                itemToDelete = item
-                                showDeleteConfirmation = true
+                        // Pass colorScheme to all section components
+                        Group {
+                            ProductsTableSection(
+                                proposal: proposal,
+                                onAdd: { showingItemSelection = true },
+                                onEdit: { item in
+                                    itemToEdit = item
+                                    showEditItemSheet = true
+                                },
+                                onDelete: { item in
+                                    itemToDelete = item
+                                    showDeleteConfirmation = true
+                                }
+                            )
+                            .id(refreshId)
+                            
+                            EngineeringTableSection(
+                                proposal: proposal,
+                                onAdd: { showingEngineeringForm = true },
+                                onEdit: { engineering in
+                                    engineeringToEdit = engineering
+                                    showEditEngineeringSheet = true
+                                },
+                                onDelete: { engineering in
+                                    deleteEngineering(engineering)
+                                }
+                            )
+                            
+                            ExpensesTableSection(
+                                proposal: proposal,
+                                onAdd: { showingExpensesForm = true },
+                                onEdit: { expense in
+                                    expenseToEdit = expense
+                                    showEditExpenseSheet = true
+                                },
+                                onDelete: { expense in
+                                    deleteExpense(expense)
+                                }
+                            )
+                            
+                            CustomTaxesTableSection(
+                                proposal: proposal,
+                                onAdd: { showingCustomTaxForm = true },
+                                onEdit: { tax in
+                                    taxToEdit = tax
+                                    showEditTaxSheet = true
+                                },
+                                onDelete: { tax in
+                                    deleteTax(tax)
+                                }
+                            )
+                            
+                            FinancialSummarySection(proposal: proposal) {
+                                showingFinancialDetails = true
                             }
-                        )
-                        .id(refreshId)  // Force refresh when id changes
-                        
-                        // ENGINEERING SECTION
-                        EngineeringTableSection(
-                            proposal: proposal,
-                            onAdd: { showingEngineeringForm = true },
-                            onEdit: { engineering in
-                                engineeringToEdit = engineering
-                                showEditEngineeringSheet = true
-                            },
-                            onDelete: { engineering in
-                                deleteEngineering(engineering)
-                            }
-                        )
-                        
-                        // EXPENSES SECTION
-                        ExpensesTableSection(
-                            proposal: proposal,
-                            onAdd: { showingExpensesForm = true },
-                            onEdit: { expense in
-                                expenseToEdit = expense
-                                showEditExpenseSheet = true
-                            },
-                            onDelete: { expense in
-                                deleteExpense(expense)
-                            }
-                        )
-                        
-                        // CUSTOM TAXES SECTION
-                        CustomTaxesTableSection(
-                            proposal: proposal,
-                            onAdd: { showingCustomTaxForm = true },
-                            onEdit: { tax in
-                                taxToEdit = tax
-                                showEditTaxSheet = true
-                            },
-                            onDelete: { tax in
-                                deleteTax(tax)
-                            }
-                        )
-                        
-                        // FINANCIAL SUMMARY SECTION
-                        FinancialSummarySection(proposal: proposal) {
-                            showingFinancialDetails = true
+                            
+                            TaskSummarySection(proposal: proposal)
+                            
+                            ActivitySummarySection(proposal: proposal)
                         }
+                        // Apply environment modifier to all sections at once
+                        .environment(\.colorScheme, colorScheme)
                         
-                        // TASK SECTION
-                        TaskSummarySection(proposal: proposal)
-                        
-                        // ACTIVITY SECTION
-                        ActivitySummarySection(proposal: proposal)
-                        
-                        // NOTES SECTION
+                        // Notes section
                         if let notes = proposal.notes, !notes.isEmpty {
                             NotesSection(notes: notes)
+                                .environment(\.colorScheme, colorScheme)
                         }
                         
                         // Add spacing at bottom for floating button
@@ -138,6 +135,7 @@ struct ProposalDetailView: View {
             
             // Floating export buttons
             ExportButtonGroup(proposal: proposal)
+                .environment(\.colorScheme, colorScheme)
         }
         .navigationBarHidden(true)
         // SHEET PRESENTATIONS

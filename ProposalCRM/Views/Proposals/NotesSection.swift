@@ -1,35 +1,33 @@
-//
-//  NotesSection.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 22.04.2025.
-//
-
-
-// NotesSection.swift
-// Section for displaying proposal notes
-
 import SwiftUI
 
 struct NotesSection: View {
     let notes: String
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.2) : Color(UIColor.secondarySystemBackground)
+    }
+    
+    private var textColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
     
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.black.opacity(0.2))
+                .fill(backgroundColor)
             
             VStack(alignment: .leading, spacing: 10) {
                 Text("Notes")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(textColor)
                 
                 Divider()
-                    .background(Color.gray.opacity(0.5))
+                    .background(colorScheme == .dark ? Color.gray.opacity(0.5) : Color.gray.opacity(0.3))
                 
                 Text(notes)
-                    .foregroundColor(.white)
+                    .foregroundColor(textColor)
             }
             .padding()
         }

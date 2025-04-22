@@ -1,8 +1,20 @@
 import SwiftUI
-
 struct FinancialSummarySection: View {
     @ObservedObject var proposal: Proposal
     var onViewDetails: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.2) : Color(UIColor.secondarySystemBackground)
+    }
+    
+    private var primaryTextColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+    
+    private var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -10,7 +22,7 @@ struct FinancialSummarySection: View {
                 Text("Financial Summary")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryTextColor)
                 
                 Spacer()
                 
@@ -23,14 +35,14 @@ struct FinancialSummarySection: View {
             // Summary card background
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.black.opacity(0.2))
+                    .fill(backgroundColor)
                 
                 VStack(spacing: 15) {
                     // Revenue components
                     Group {
                         Text("REVENUE")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
                         summaryRow(title: "Products Subtotal", value: proposal.subtotalProducts)
@@ -40,25 +52,25 @@ struct FinancialSummarySection: View {
                     }
                     
                     Divider()
-                        .background(Color.gray)
+                        .background(colorScheme == .dark ? Color.gray : Color.gray.opacity(0.5))
                     
                     // Total revenue
                     summaryRow(
                         title: "TOTAL REVENUE",
                         value: proposal.totalAmount,
-                        titleColor: .white,
-                        valueColor: .white,
+                        titleColor: primaryTextColor,
+                        valueColor: primaryTextColor,
                         isBold: true
                     )
                     
                     Divider()
-                        .background(Color.gray)
+                        .background(colorScheme == .dark ? Color.gray : Color.gray.opacity(0.5))
                     
                     // COST STRUCTURE
                     Group {
                         Text("COST STRUCTURE")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
                         // Partner Cost for products
@@ -73,20 +85,20 @@ struct FinancialSummarySection: View {
                     }
                     
                     Divider()
-                        .background(Color.gray)
+                        .background(colorScheme == .dark ? Color.gray : Color.gray.opacity(0.5))
                     
                     // Total cost
                     let totalCost = proposal.totalCost
                     summaryRow(
                         title: "TOTAL COST",
                         value: totalCost,
-                        titleColor: .white,
-                        valueColor: .white,
+                        titleColor: primaryTextColor,
+                        valueColor: primaryTextColor,
                         isBold: true
                     )
                     
                     Divider()
-                        .background(Color.gray)
+                        .background(colorScheme == .dark ? Color.gray : Color.gray.opacity(0.5))
                     
                     // Profit analysis
                     let grossProfit = proposal.totalAmount - totalCost
@@ -115,22 +127,22 @@ struct FinancialSummarySection: View {
         title: String,
         value: Double,
         valueFormatter: (Double) -> String = { Formatters.formatEuro($0) },
-        titleColor: Color = .gray,
-        valueColor: Color = .white,
+        titleColor: Color? = nil,
+        valueColor: Color? = nil,
         isBold: Bool = false
     ) -> some View {
         HStack {
             Text(title)
                 .font(isBold ? .headline : .subheadline)
                 .fontWeight(isBold ? .bold : .regular)
-                .foregroundColor(titleColor)
+                .foregroundColor(titleColor ?? secondaryTextColor)
             
             Spacer()
             
             Text(valueFormatter(value))
                 .font(isBold ? .headline : .subheadline)
                 .fontWeight(isBold ? .bold : .regular)
-                .foregroundColor(valueColor)
+                .foregroundColor(valueColor ?? primaryTextColor)
         }
     }
     
