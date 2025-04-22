@@ -1,0 +1,281 @@
+// CoreDataModel.swift
+// This file provides programmatic definitions for the Core Data model entities
+
+import Foundation
+import CoreData
+
+// Core Data Model Manager
+// COMMENTED OUT TO AVOID DUPLICATION WITH Persistence.swift
+/*
+class PersistenceController {
+    static let shared = PersistenceController()
+    
+    let container: NSPersistentContainer
+    
+    init(inMemory: Bool = false) {
+        container = NSPersistentContainer(name: "ProposalCRM")
+        
+        if inMemory {
+            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+        }
+        
+        container.loadPersistentStores { (storeDescription, error) in
+            if let error = error as NSError? {
+                fatalError("Unresolved error \(error), \(error.userInfo)")
+            }
+        }
+        
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+}
+
+// Extension for creating sample data for preview
+*/
+
+extension PersistenceController {
+    static var preview: PersistenceController = {
+        let controller = PersistenceController(inMemory: true)
+        let viewContext = controller.container.viewContext
+        
+        // Create sample customers
+        let customer1 = Customer(context: viewContext)
+        customer1.id = UUID()
+        customer1.name = "Acme Corporation"
+        customer1.email = "contact@acme.com"
+        customer1.phone = "555-123-4567"
+        customer1.address = "123 Main St, Anytown, USA"
+        
+        let customer2 = Customer(context: viewContext)
+        customer2.id = UUID()
+        customer2.name = "Tech Industries"
+        customer2.email = "info@techindustries.com"
+        customer2.phone = "555-987-6543"
+        customer2.address = "456 Innovation Way, Silicon Valley, USA"
+        
+        // Create sample products
+        let product1 = Product(context: viewContext)
+        product1.id = UUID()
+        product1.code = "CAM-001"
+        product1.name = "High-Resolution Camera"
+        product1.description = "Industrial 4K camera for machine vision applications"
+        product1.category = "Cameras"
+        product1.listPrice = 1299.99
+        product1.partnerPrice = 999.99
+        
+        let product2 = Product(context: viewContext)
+        product2.id = UUID()
+        product2.code = "LENS-001"
+        product2.name = "Wide-Angle Lens"
+        product2.description = "120° wide-angle lens for industrial cameras"
+        product2.category = "Lenses"
+        product2.listPrice = 499.99
+        product2.partnerPrice = 399.99
+        
+        // Create sample proposal
+        let proposal = Proposal(context: viewContext)
+        proposal.id = UUID()
+        proposal.number = "PROP-2023-001"
+        proposal.customer = customer1
+        proposal.creationDate = Date()
+        proposal.status = "Draft"
+        proposal.totalAmount = 1799.98
+        
+        // Create sample proposal items
+        let proposalItem1 = ProposalItem(context: viewContext)
+        proposalItem1.id = UUID()
+        proposalItem1.product = product1
+        proposalItem1.proposal = proposal
+        proposalItem1.quantity = 1
+        proposalItem1.unitPrice = 1299.99
+        proposalItem1.discount = 0
+        proposalItem1.amount = 1299.99
+        
+        let proposalItem2 = ProposalItem(context: viewContext)
+        proposalItem2.id = UUID()
+        proposalItem2.product = product2
+        proposalItem2.proposal = proposal
+        proposalItem2.quantity = 1
+        proposalItem2.unitPrice = 499.99
+        proposalItem2.discount = 0
+        proposalItem2.amount = 499.99
+        
+        do {
+            try viewContext.save()
+        } catch {
+            let nsError = error as NSError
+            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        }
+        
+        return controller
+    }()
+}
+
+// MARK: - CoreData entity extensions
+
+// Customer extension
+extension Customer {
+    var formattedName: String {
+        return name ?? "Unknown Customer"
+    }
+    
+    var proposalsArray: [Proposal] {
+        let set = proposals as? Set<Proposal> ?? []
+        return set.sorted {
+            $0.creationDate ?? Date() > $1.creationDate ?? Date()
+        }
+    }
+}
+
+// Product extension
+extension Product {
+    var formattedCode: String {
+        return code ?? "Unknown Code"
+    }
+    
+    var formattedName: String {
+        return name ?? "Unknown Product"
+    }
+    
+    var formattedPrice: String {
+        return String(format: "%.2f", listPrice)
+    }
+}
+
+// Proposal extension
+extension Proposal {
+    var formattedNumber: String {
+        return number ?? "New Proposal"
+    }
+    
+    var formattedDate: String {
+        guard let date = creationDate else {
+            return "Unknown Date"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+    
+    var formattedStatus: String {
+        return status ?? "Draft"
+    }
+    
+    var formattedTotal: String {
+        return String(format: "%.2f", totalAmount)
+    }
+    
+    var customerName: String {
+        return customer?.name ?? "No Customer"
+    }
+    
+    var itemsArray: [ProposalItem] {
+        let set = items as? Set<ProposalItem> ?? []
+        return set.sorted {
+            $0.product?.name ?? "" < $1.product?.name ?? ""
+        }
+    }
+    
+    var engineeringArray: [Engineering] {
+        let set = engineering as? Set<Engineering> ?? []
+        return set.sorted {
+            $0.description ?? "" < $1.description ?? ""
+        }
+    }
+    
+    var expensesArray: [Expense] {
+        let set = expenses as? Set<Expense> ?? []
+        return set.sorted {
+            $0.description ?? "" < $1.description ?? ""
+        }
+    }
+    
+    var taxesArray: [CustomTax] {
+        let set = taxes as? Set<CustomTax> ?? []
+        return set.sorted {
+            $0.name ?? "" < $1.name ?? ""
+        }
+    }
+    
+    var subtotalProducts: Double {
+        let items = itemsArray
+        return items.reduce(0) { $0 + $1.amount }
+    }
+    
+    var subtotalEngineering: Double {
+        let engineering = engineeringArray
+        return engineering.reduce(0) { $0 + $1.amount }
+    }
+    
+    var subtotalExpenses: Double {
+        let expenses = expensesArray
+        return expenses.reduce(0) { $0 + $1.amount }
+    }
+    
+    var subtotalTaxes: Double {
+        let taxes = taxesArray
+        return taxes.reduce(0) { $0 + $1.amount }
+    }
+    
+    var totalCost: Double {
+        var cost = 0.0
+        for item in itemsArray {
+            if let product = item.product {
+                cost += product.partnerPrice * item.quantity
+            }
+        }
+        return cost + subtotalExpenses
+    }
+    
+    var grossProfit: Double {
+        return totalAmount - totalCost
+    }
+    
+    var profitMargin: Double {
+        if totalAmount == 0 {
+            return 0
+        }
+        return (grossProfit / totalAmount) * 100
+    }
+}
+
+// ProposalItem extension
+extension ProposalItem {
+    var productName: String {
+        return product?.name ?? "Unknown Product"
+    }
+    
+    var productCode: String {
+        return product?.code ?? "Unknown Code"
+    }
+    
+    var formattedAmount: String {
+        return String(format: "%.2f", amount)
+    }
+}
+
+// Engineering extension
+extension Engineering {
+    var formattedAmount: String {
+        return String(format: "%.2f", amount)
+    }
+}
+
+// Expense extension
+extension Expense {
+    var formattedAmount: String {
+        return String(format: "%.2f", amount)
+    }
+}
+
+// CustomTax extension
+extension CustomTax {
+    var formattedRate: String {
+        return String(format: "%.2f%%", rate)
+    }
+    
+    var formattedAmount: String {
+        return String(format: "%.2f", amount)
+    }
+}
