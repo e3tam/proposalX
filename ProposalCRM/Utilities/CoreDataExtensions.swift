@@ -1,25 +1,23 @@
-//
-//  CoreDataExtensions.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 21.04.2025.
-//
+// CoreDataExtensions.swift
+// Extensions for Core Data model to support attachments and drawing notes
 
-//
-//  CoreDataExtensions.swift
-//  ProposalCRM
-//
-
+import Foundation
 import CoreData
+import SwiftUI
 
-extension NSManagedObject {
-    func refreshAllProperties() {
-        let mirror = Mirror(reflecting: self)
-        for child in mirror.children {
-            if let propertyName = child.label {
-                // Access the property to trigger faulting
-                _ = value(forKey: propertyName)
-            }
+// MARK: - Proposal Extensions for Attachments and Drawing Notes
+extension Proposal {
+    // Helper to check and update drawing status
+    func updateDrawingNotesStatus() {
+        // Update the hasDrawingNotes flag based on drawing data
+        self.hasDrawingNotes = drawingData != nil && !(drawingData?.isEmpty ?? true)
+    }
+    
+    // Attachments relationship accessor
+    var attachmentsArray: [Attachment] {
+        let set = attachments as? Set<Attachment> ?? []
+        return set.sorted {
+            $0.addedDate ?? Date() > $1.addedDate ?? Date()
         }
     }
 }
