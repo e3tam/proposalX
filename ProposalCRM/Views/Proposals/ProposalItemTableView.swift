@@ -226,8 +226,11 @@ struct EnhancedProductTableView: View {
                                             Divider().frame(height: 30)
                                             
                                             // Custom tax (assuming not applied by default)
-                                            Text("No")
+                                            // In the ProposalItemTableView or EnhancedProductTableView, modify the Custom Tax column:
+                                            // In ProposalItemTableView.swift, enhance the Custom Tax column
+                                            Text(item.applyCustomTax ? "Yes" : "No")
                                                 .font(.system(size: 14))
+                                                .foregroundColor(item.applyCustomTax ? .green : .gray)
                                                 .frame(width: 90, alignment: .center)
                                                 .padding(.horizontal, 5)
                                         }

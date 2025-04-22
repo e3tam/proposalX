@@ -37,6 +37,35 @@ struct ProductTableView: View {
         .cornerRadius(10)
     }
     
+    private func taxDetails(for item: ProposalItem) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if item.applyCustomTax {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 12))
+                    Text("Custom tax applied")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                
+                if let product = item.product {
+                    Text("Tax base: \(Formatters.formatEuro(product.partnerPrice * item.quantity))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                HStack {
+                    Image(systemName: "xmark.circle")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 12))
+                    Text("No custom tax")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+    }
     private func productTableHeader() -> some View {
         HStack(spacing: 0) {
             Text("Product Name")

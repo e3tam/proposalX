@@ -31,6 +31,23 @@ struct CustomTaxesTableView: View {
 
             Divider().background(Color.gray)
 
+            // Add this to CustomTaxesTableView to show the taxable base
+            HStack {
+                Text("Taxable Products:")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                
+                Text(Formatters.formatEuro(proposal.taxableProductsAmount))
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .frame(width: 150, alignment: .trailing)
+                    .padding(.horizontal, 5)
+            }
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.2))
+            
             // Main table content with rows
             if proposal.taxesArray.isEmpty {
                 Text("No custom taxes added yet")

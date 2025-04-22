@@ -1,14 +1,3 @@
-//
-//  FinancialSummarySection.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 22.04.2025.
-//
-
-
-// FinancialSummarySection.swift
-// Financial summary section for proposal detail view
-
 import SwiftUI
 
 struct FinancialSummarySection: View {
@@ -39,6 +28,11 @@ struct FinancialSummarySection: View {
                 VStack(spacing: 15) {
                     // Revenue components
                     Group {
+                        Text("REVENUE")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
                         summaryRow(title: "Products Subtotal", value: proposal.subtotalProducts)
                         summaryRow(title: "Engineering Subtotal", value: proposal.subtotalEngineering)
                         summaryRow(title: "Expenses Subtotal", value: proposal.subtotalExpenses)
@@ -60,12 +54,44 @@ struct FinancialSummarySection: View {
                     Divider()
                         .background(Color.gray)
                     
+                    // COST STRUCTURE
+                    Group {
+                        Text("COST STRUCTURE")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        // Partner Cost for products
+                        let partnerCost = calculatePartnerCost()
+                        summaryRow(title: "Partner Product Costs", value: partnerCost)
+                        
+                        // Expenses are considered costs
+                        summaryRow(title: "Expenses", value: proposal.subtotalExpenses)
+                        
+                        // Custom taxes are now included as costs
+                        summaryRow(title: "Custom Taxes", value: proposal.subtotalTaxes)
+                    }
+                    
+                    Divider()
+                        .background(Color.gray)
+                    
+                    // Total cost
+                    let totalCost = proposal.totalCost
+                    summaryRow(
+                        title: "TOTAL COST",
+                        value: totalCost,
+                        titleColor: .white,
+                        valueColor: .white,
+                        isBold: true
+                    )
+                    
+                    Divider()
+                        .background(Color.gray)
+                    
                     // Profit analysis
-                    let partnerCost = calculatePartnerCost()
-                    let grossProfit = proposal.totalAmount - partnerCost
+                    let grossProfit = proposal.totalAmount - totalCost
                     let profitMargin = proposal.totalAmount > 0 ? (grossProfit / proposal.totalAmount) * 100 : 0
                     
-                    summaryRow(title: "Total Cost", value: partnerCost)
                     summaryRow(
                         title: "Gross Profit",
                         value: grossProfit,
@@ -113,12 +139,10 @@ struct FinancialSummarySection: View {
         
         // Sum partner cost for all products
         for item in proposal.itemsArray {
-            let partnerPrice = item.product?.partnerPrice ?? 0
-            totalCost += partnerPrice * item.quantity
+            if let product = item.product {
+                totalCost += product.partnerPrice * item.quantity
+            }
         }
-        
-        // Add expenses
-        totalCost += proposal.subtotalExpenses
         
         return totalCost
     }

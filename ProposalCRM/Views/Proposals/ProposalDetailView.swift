@@ -352,6 +352,8 @@ struct ProposalDetailView: View {
             let nsError = error as NSError
             print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
         }
+        
+        proposal.recalculateCustomTaxes()
     }
 }
 

@@ -34,9 +34,13 @@ struct CustomTaxEditMenu: View {
         _rate = State(initialValue: customTax.rate)
     }
     
-    // Calculate the base amount on which tax applies
+    // Replace the subtotal calculation in CustomTaxEditMenu.swift
+    // Update the subtotal calculation in CustomTaxEditMenu
+    // in CustomTaxEditMenu.swift
+
+    // Updated subtotal calculation - ONLY product partner prices
     private var subtotal: Double {
-        return proposal.subtotalProducts + proposal.subtotalEngineering + proposal.subtotalExpenses
+        return proposal.taxableProductsAmount
     }
     
     // Calculate the tax amount

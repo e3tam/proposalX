@@ -21,8 +21,9 @@ struct CustomTaxView: View {
     @State private var showingCommonTaxes = false
     
     // Calculate tax base
+    // Replace the existing taxBase calculation in CustomTaxView.swift
     private var taxBase: Double {
-        return proposal.subtotalProducts + proposal.subtotalEngineering + proposal.subtotalExpenses
+        return proposal.taxableProductsAmount
     }
     
     var body: some View {
@@ -237,81 +238,67 @@ struct CustomTaxView: View {
                 
                 // MARK: - Tax Base Section
                 Section(header: Text("TAX CALCULATION")) {
-                    // Display tax base components
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Tax Base Components:")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        HStack {
-                            Text("Products:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(Formatters.formatEuro(proposal.subtotalProducts))
-                                .font(.caption)
-                        }
-                        
-                        HStack {
-                            Text("Engineering:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(Formatters.formatEuro(proposal.subtotalEngineering))
-                                .font(.caption)
-                        }
-                        
-                        HStack {
-                            Text("Expenses:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(Formatters.formatEuro(proposal.subtotalExpenses))
-                                .font(.caption)
-                        }
-                        
-                        Divider()
-                        
-                        HStack {
-                            Text("Total Tax Base:")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Spacer()
-                            Text(Formatters.formatEuro(taxBase))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    
-                    // Calculated tax amount
-                    if let rateValue = Double(rate), rateValue > 0 {
-                        let calculatedAmount = taxBase * (rateValue / 100)
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Tax Rate:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Text(Formatters.formatPercent(rateValue))
-                                    .font(.subheadline)
-                            }
-                            
-                            HStack {
-                                Text("Calculated Tax:")
-                                    .font(.headline)
-                                Spacer()
-                                Text(Formatters.formatEuro(calculatedAmount))
-                                    .font(.headline)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                }
+                                   // Display tax base components
+                                   VStack(alignment: .leading, spacing: 8) {
+                                       Text("Tax Base Components:")
+                                           .font(.subheadline)
+                                           .foregroundColor(.secondary)
+                                       
+                                       HStack {
+                                           Text("Products (taxable, partner price):")
+                                               .font(.caption)
+                                               .foregroundColor(.secondary)
+                                           Spacer()
+                                           Text(Formatters.formatEuro(proposal.taxableProductsAmount))
+                                               .font(.caption)
+                                       }
+                                       
+                                       Divider()
+                                       
+                                       HStack {
+                                           Text("Total Tax Base:")
+                                               .font(.subheadline)
+                                               .fontWeight(.medium)
+                                           Spacer()
+                                           Text(Formatters.formatEuro(taxBase))
+                                               .font(.subheadline)
+                                               .fontWeight(.medium)
+                                       }
+                                       
+                                       Text("Note: Only products marked with 'Apply Custom Tax' are included, calculated using partner price × quantity")
+                                           .font(.caption2)
+                                           .foregroundColor(.secondary)
+                                   }
+                                   .padding()
+                                   .background(Color(.systemGray6))
+                                   .cornerRadius(8)
+                                   
+                                   // Calculated tax amount
+                                   if let rateValue = Double(rate), rateValue > 0 {
+                                       let calculatedAmount = taxBase * (rateValue / 100)
+                                       VStack(alignment: .leading, spacing: 8) {
+                                           HStack {
+                                               Text("Tax Rate:")
+                                                   .font(.subheadline)
+                                               Spacer()
+                                               Text(Formatters.formatPercent(rateValue))
+                                                   .font(.subheadline)
+                                           }
+                                           
+                                           HStack {
+                                               Text("Calculated Tax:")
+                                                   .font(.headline)
+                                               Spacer()
+                                               Text(Formatters.formatEuro(calculatedAmount))
+                                                   .font(.headline)
+                                                   .foregroundColor(.red)
+                                           }
+                                       }
+                                       .padding()
+                                       .background(Color.red.opacity(0.1))
+                                       .cornerRadius(8)
+                                   }
+                               }
                 
                 // MARK: - Preview Section
                 if !name.isEmpty && Double(rate) != nil {
@@ -462,34 +449,34 @@ struct CustomTaxView: View {
     }
     
     private func addCustomTax() {
-        let tax = CustomTax(context: viewContext)
-        tax.id = UUID()
-        tax.name = name
-        tax.rate = Double(rate) ?? 0
-        
-        // Calculate amount based on tax base
-        tax.amount = taxBase * (tax.rate / 100)
-        tax.proposal = proposal
-        
-        do {
-            try viewContext.save()
-            
-            // Update proposal total
-            updateProposalTotal()
-            
-            // Log activity
-            ActivityLogger.logItemAdded(
-                proposal: proposal,
-                context: viewContext,
-                itemType: "Tax",
-                itemName: name
-            )
-            
-            presentationMode.wrappedValue.dismiss()
-        } catch {
-            print("Error adding custom tax: \(error)")
-        }
-    }
+           let tax = CustomTax(context: viewContext)
+           tax.id = UUID()
+           tax.name = name
+           tax.rate = Double(rate) ?? 0
+           
+           // Calculate amount based on tax base
+           tax.amount = taxBase * (tax.rate / 100)
+           tax.proposal = proposal
+           
+           do {
+               try viewContext.save()
+               
+               // Update proposal total
+               updateProposalTotal()
+               
+               // Log activity
+               ActivityLogger.logItemAdded(
+                   proposal: proposal,
+                   context: viewContext,
+                   itemType: "Tax",
+                   itemName: name
+               )
+               
+               presentationMode.wrappedValue.dismiss()
+           } catch {
+               print("Error adding custom tax: \(error)")
+           }
+       }
     
     private func updateProposalTotal() {
         let productsTotal = proposal.subtotalProducts
@@ -527,6 +514,23 @@ struct CustomTaxView_Previews: PreviewProvider {
         let proposal = Proposal(context: context)
         proposal.id = UUID()
         proposal.number = "PROP-2023-001"
+        
+        // Create some sample products for the preview
+        let product = Product(context: context)
+        product.id = UUID()
+        product.name = "Sample Product"
+        product.listPrice = 1000
+        product.partnerPrice = 800
+        
+        // Create a proposal item with applyCustomTax = true
+        let item = ProposalItem(context: context)
+        item.id = UUID()
+        item.product = product
+        item.proposal = proposal
+        item.quantity = 1
+        item.applyCustomTax = true
+        
+        try? context.save()
         
         return CustomTaxView(proposal: proposal)
             .environment(\.managedObjectContext, context)

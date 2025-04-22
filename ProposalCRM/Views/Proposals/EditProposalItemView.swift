@@ -98,6 +98,39 @@ struct EditProposalItemView: View {
                             .foregroundColor(.blue)
                     }
                     
+                    Section(header: Text("TAX SETTINGS")) {
+                        Toggle("Apply Custom Tax", isOn: Binding(
+                            get: { item.applyCustomTax },
+                            set: {
+                                item.applyCustomTax = $0
+                                
+                                // Update tax calculations
+                                if let proposal = item.proposal, !proposal.taxesArray.isEmpty {
+                                    proposal.recalculateCustomTaxes()
+                                }
+                            }
+                        ))
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        
+                        if item.applyCustomTax {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let product = item.product {
+                                    HStack {
+                                        Text("Tax base (partner price):")
+                                            .font(.caption)
+                                        Spacer()
+                                        Text(Formatters.formatEuro(product.partnerPrice * item.quantity))
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                                
+                                Text("Custom taxes will be calculated ONLY using partner price × quantity")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Multiplier")
                             .foregroundColor(.gray)
@@ -271,6 +304,29 @@ struct EditProposalItemView: View {
             presentationMode.wrappedValue.dismiss()
         } catch {
             print("Error saving changes: \(error)")
+        }
+    }
+    
+    private func updateTaxCalculations() {
+        // Update any custom taxes that might be applied
+        if let proposal = item.proposal {
+            for tax in proposal.taxesArray {
+                // Recalculate tax amount based on new taxable base
+                let taxBase = proposal.taxableProductsAmount + proposal.subtotalEngineering + proposal.subtotalExpenses
+                tax.amount = taxBase * (tax.rate / 100)
+            }
+            
+            // Update proposal total amount
+            proposal.totalAmount = proposal.subtotalProducts + proposal.subtotalEngineering +
+                                   proposal.subtotalExpenses + proposal.subtotalTaxes
+            
+            do {
+                if let context = item.managedObjectContext {
+                    try context.save()
+                }
+            } catch {
+                print("Error updating tax calculations: \(error)")
+            }
         }
     }
 }

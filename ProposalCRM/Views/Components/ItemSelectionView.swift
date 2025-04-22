@@ -5,6 +5,11 @@ struct ItemSelectionView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var proposal: Proposal
+    @State private var applyCustomTax = false
+    
+    // Add these dictionaries for product quantities and discounts
+    @State private var quantityForProduct: [UUID: Double] = [:]
+    @State private var discountForProduct: [UUID: Double] = [:]
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Product.category, ascending: true),
@@ -82,10 +87,42 @@ struct ItemSelectionView: View {
                                 selectedProducts.remove(product)
                             } else {
                                 selectedProducts.insert(product)
+                                
+                                // Initialize quantity and discount for newly selected product
+                                if let id = product.id {
+                                    if quantityForProduct[id] == nil {
+                                        quantityForProduct[id] = 1.0
+                                    }
+                                    if discountForProduct[id] == nil {
+                                        discountForProduct[id] = 0.0
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                
+                // Tax settings section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("TAX SETTINGS")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top)
+                    
+                    Toggle("Apply Custom Tax", isOn: $applyCustomTax)
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        .padding(.horizontal)
+                    
+                    if applyCustomTax {
+                        Text("Custom taxes will be calculated based on these items")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                    }
+                }
+                .background(Color(UIColor.secondarySystemBackground))
                 
                 // Selected count and add button
                 VStack {
@@ -95,7 +132,7 @@ struct ItemSelectionView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Button(action: addSelectedProducts) {
+                    Button(action: addSelectedItems) {
                         Text("Add Selected Products")
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -109,7 +146,14 @@ struct ItemSelectionView: View {
             }
             .navigationTitle("Add Products")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        addSelectedItems()
+                    }
+                    .disabled(selectedProducts.isEmpty)
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
@@ -118,38 +162,55 @@ struct ItemSelectionView: View {
         }
     }
     
-    private func addSelectedProducts() {
+    // Combined function that adds products to the proposal
+    private func addSelectedItems() {
         for product in selectedProducts {
-            let proposalItem = ProposalItem(context: viewContext)
-            proposalItem.id = UUID()
-            proposalItem.product = product
-            proposalItem.proposal = proposal
-            proposalItem.quantity = 1
-            proposalItem.unitPrice = product.listPrice
-            proposalItem.discount = 0
-            proposalItem.amount = product.listPrice
+            // Create new proposal item
+            let item = ProposalItem(context: viewContext)
+            item.id = UUID()
+            item.proposal = proposal
+            item.product = product
             
-            // Log activity
+            // Get quantity from our quantity dictionary
+            if let id = product.id {
+                item.quantity = quantityForProduct[id] ?? 1.0
+                item.discount = discountForProduct[id] ?? 0.0
+            } else {
+                item.quantity = 1.0
+                item.discount = 0.0
+            }
+            
+            // Set pricing
+            item.unitPrice = product.listPrice
+            item.multiplier = 1.0 // Default multiplier
+            
+            // Calculate amount
+            let discountFactor = 1.0 - (item.discount / 100.0)
+            item.amount = item.quantity * item.unitPrice * discountFactor
+            
+            // Apply the custom tax flag
+            item.applyCustomTax = applyCustomTax
+            
+            // Log the activity
             ActivityLogger.logItemAdded(
                 proposal: proposal,
                 context: viewContext,
                 itemType: "Product",
-                itemName: product.name ?? "Unknown"
+                itemName: product.name ?? "Unknown Product"
             )
         }
         
+        // Save context and update totals
         do {
             try viewContext.save()
-            
-            // Update proposal total
             updateProposalTotal()
-            
             presentationMode.wrappedValue.dismiss()
         } catch {
             print("Error adding products: \(error)")
         }
     }
     
+    // Helper function to update proposal total
     private func updateProposalTotal() {
         let productsTotal = proposal.subtotalProducts
         let engineeringTotal = proposal.subtotalEngineering
@@ -157,6 +218,9 @@ struct ItemSelectionView: View {
         let taxesTotal = proposal.subtotalTaxes
         
         proposal.totalAmount = productsTotal + engineeringTotal + expensesTotal + taxesTotal
+        
+        // Recalculate taxes based on the new taxable items
+        proposal.recalculateCustomTaxes()
         
         do {
             try viewContext.save()
