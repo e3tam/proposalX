@@ -5,7 +5,7 @@
 //  Created by Ali Sami Gözükırmızı on 22.04.2025.
 //
 
-// File: ProposalCRM/Models/CoreDataModel.swift
+// File: ProposalCRM/Models/CoreDaxtaModel.swift
 // This file provides programmatic definitions for the Core Data model entities
 
 import Foundation
@@ -39,6 +39,38 @@ extension Proposal {
         return number ?? "New Proposal"
     }
 
+
+    
+    // Add to Proposal extension in CoreDataModel.swift
+    func recalculateCustomTaxes() {
+           // Tax base includes ONLY taxable products at partner price
+           let taxableBase = taxableProductsAmount
+           
+           // Update all custom taxes
+           for tax in taxesArray {
+               tax.amount = taxableBase * (tax.rate / 100)
+           }
+           
+           do {
+               if let context = self.managedObjectContext {
+                   try context.save()
+               }
+           } catch {
+               print("Error saving tax recalculation: \(error)")
+           }
+       }
+    
+    // Update the existing taxableProductsAmount property
+    var taxableProductsAmount: Double {
+           let taxableItems = itemsArray.filter { $0.applyCustomTax }
+           return taxableItems.reduce(0) { total, item in
+               if let product = item.product {
+                   return total + (item.quantity * product.partnerPrice)
+               }
+               return total
+           }
+       }
+    
     var formattedDate: String {
         guard let date = creationDate else {
             return "Unknown Date"
@@ -116,13 +148,18 @@ extension Proposal {
     // --- Cost and Profit calculations (values remain Double) ---
     var totalCost: Double {
         var cost = 0.0
+        // Product costs at partner prices
         for item in itemsArray {
             if let product = item.product {
                 cost += product.partnerPrice * item.quantity
             }
         }
-        // Note: Assumes Engineering is PROFIT, not cost. Adjust if needed.
-        return cost + subtotalExpenses
+        // Add expenses
+        cost += subtotalExpenses
+        // Add custom taxes as part of cost structure
+        cost += subtotalTaxes
+        
+        return cost
     }
 
     var grossProfit: Double {
