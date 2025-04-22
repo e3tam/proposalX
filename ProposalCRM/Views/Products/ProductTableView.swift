@@ -245,9 +245,9 @@ struct HeaderCell: View {
 
 struct VerticalDivider: View {
     var body: some View {
-        Divider()
-            .frame(height: 36)
-            .background(Color.gray)
-            .opacity(0.5)
+        // Create a rectangle instead of using Divider
+        Rectangle()
+            .fill(Color.gray.opacity(0.5))
+            .frame(width: 1, height: 36)
     }
 }

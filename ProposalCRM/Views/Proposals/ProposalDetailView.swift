@@ -176,7 +176,7 @@ struct ProposalDetailView: View {
             EditProposalView(proposal: proposal)
         }
         .sheet(isPresented: $showingFinancialDetails) {
-            FinancialSummaryDetailView(proposal: proposal)
+            EnhancedFinancialSummaryView(proposal: proposal)
         }
         .sheet(isPresented: $showEditEngineeringSheet) {
             if let engineering = engineeringToEdit {
@@ -397,93 +397,968 @@ struct ProposalDetailView: View {
     }
     
     // MARK: - Financial Summary Section
-    private var financialSummarySection: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.black.opacity(0.2))
-            
-            VStack(alignment: .leading, spacing: 15) {
-                // Progress bar at the top
-                Rectangle()
-                    .frame(height: 4)
-                    .foregroundColor(.gray.opacity(0.3))
-                    .overlay(
-                        GeometryReader { geometry in
-                            Rectangle()
-                                .frame(width: geometry.size.width * 0.65)
-                                .foregroundColor(.white)
-                        }
-                    )
-                    .cornerRadius(2)
-                    .padding(.bottom, 20)
+
+
+    struct EnhancedFinancialSummaryView: View {
+        @ObservedObject var proposal: Proposal
+        @Environment(\.presentationMode) var presentationMode
+        @Environment(\.colorScheme) var colorScheme
+        
+        // MARK: - Data Preparation
+        
+        // Revenue breakdown data
+        private var revenueData: [DoughnutChartItem] {
+            var data: [DoughnutChartItem] = []
+            if proposal.subtotalProducts > 0 {
+                data.append(DoughnutChartItem(name: "Products", value: proposal.subtotalProducts, color: .blue))
+            }
+            if proposal.subtotalEngineering > 0 {
+                data.append(DoughnutChartItem(name: "Engineering", value: proposal.subtotalEngineering, color: .green))
+            }
+            if proposal.subtotalExpenses > 0 {
+                data.append(DoughnutChartItem(name: "Expenses", value: proposal.subtotalExpenses, color: .orange))
+            }
+            if proposal.subtotalTaxes > 0 {
+                data.append(DoughnutChartItem(name: "Taxes", value: proposal.subtotalTaxes, color: .red))
+            }
+            return data
+        }
+        
+        // Product categories data
+        private var productCategoryData: [BarChartItem] {
+            var categoryTotals: [String: (total: Double, cost: Double)] = [:]
+            for item in proposal.itemsArray {
+                let category = item.product?.category ?? "Uncategorized"
+                let amount = item.amount
+                let cost = (item.product?.partnerPrice ?? 0) * item.quantity
                 
-                HStack {
-                    Text("Financial Summary")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+                if let existing = categoryTotals[category] {
+                    categoryTotals[category] = (
+                        total: existing.total + amount,
+                        cost: existing.cost + cost
+                    )
+                } else {
+                    categoryTotals[category] = (total: amount, cost: cost)
+                }
+            }
+            
+            return categoryTotals.map { category, values in
+                let profit = values.total - values.cost
+                return BarChartItem(name: category, value: values.total, color: profit >= 0 ? .blue : .red)
+            }.sorted { $0.value > $1.value }
+        }
+        
+        // Profit by category data
+        private var profitCategoryData: [BarChartItem] {
+            var categoryTotals: [String: (total: Double, cost: Double)] = [:]
+            for item in proposal.itemsArray {
+                let category = item.product?.category ?? "Uncategorized"
+                let amount = item.amount
+                let cost = (item.product?.partnerPrice ?? 0) * item.quantity
+                
+                if let existing = categoryTotals[category] {
+                    categoryTotals[category] = (
+                        total: existing.total + amount,
+                        cost: existing.cost + cost
+                    )
+                } else {
+                    categoryTotals[category] = (total: amount, cost: cost)
+                }
+            }
+            
+            return categoryTotals.map { category, values in
+                let profit = values.total - values.cost
+                return BarChartItem(name: category, value: profit, color: profit >= 0 ? .green : .red)
+            }.sorted { abs($0.value) > abs($1.value) }
+        }
+        
+        // Cost breakdown data
+        private var costBreakdownData: [DoughnutChartItem] {
+            var costs: [DoughnutChartItem] = []
+            
+            // Product costs
+            let productsCost = proposal.itemsArray.reduce(0.0) { total, item in
+                total + ((item.product?.partnerPrice ?? 0) * item.quantity)
+            }
+            if productsCost > 0 {
+                costs.append(DoughnutChartItem(name: "Products", value: productsCost, color: .blue))
+            }
+            
+            // Engineering costs (if any are considered costs)
+            // This assumes engineering is not a cost but revenue, adjust if needed
+            
+            // Expenses by category
+            let travelExpenses = proposal.expensesArray.filter {
+                ($0.desc?.lowercased().contains("travel") ?? false) ||
+                ($0.desc?.lowercased().contains("flight") ?? false) ||
+                ($0.desc?.lowercased().contains("hotel") ?? false)
+            }.reduce(0.0) { $0 + $1.amount }
+            
+            let shippingExpenses = proposal.expensesArray.filter {
+                ($0.desc?.lowercased().contains("shipping") ?? false) ||
+                ($0.desc?.lowercased().contains("delivery") ?? false)
+            }.reduce(0.0) { $0 + $1.amount }
+            
+            let otherExpenses = proposal.subtotalExpenses - travelExpenses - shippingExpenses
+            
+            if travelExpenses > 0 {
+                costs.append(DoughnutChartItem(name: "Travel", value: travelExpenses, color: .orange))
+            }
+            if shippingExpenses > 0 {
+                costs.append(DoughnutChartItem(name: "Shipping", value: shippingExpenses, color: .purple))
+            }
+            if otherExpenses > 0 {
+                costs.append(DoughnutChartItem(name: "Other Expenses", value: otherExpenses, color: .gray))
+            }
+            
+            return costs
+        }
+        
+        // Discount analysis data
+        private var discountAnalysisData: [BarChartItem] {
+            var categoryDiscounts: [String: [Double]] = [:]
+            
+            for item in proposal.itemsArray {
+                let category = item.product?.category ?? "Uncategorized"
+                categoryDiscounts[category, default: []].append(item.discount)
+            }
+            
+            return categoryDiscounts.map { category, discounts in
+                let totalDiscount = discounts.reduce(0, +)
+                let avgDiscount = discounts.isEmpty ? 0 : totalDiscount / Double(discounts.count)
+                return BarChartItem(name: category, value: avgDiscount, color: .orange)
+            }.sorted { $0.value > $1.value }
+        }
+        
+        // Financial ratio data
+        private var financialRatios: [FinancialRatioViewModel] {
+            let profitMargin = proposal.profitMargin
+            
+            // Calculate return on investment
+            let totalCost = proposal.totalCost
+            let grossProfit = proposal.grossProfit
+            let roi = totalCost > 0 ? (grossProfit / totalCost) * 100 : 0
+            
+            // Calculate average discount
+            let totalDiscount = proposal.itemsArray.reduce(0.0) { $0 + $1.discount }
+            let avgDiscount = proposal.itemsArray.isEmpty ? 0 : totalDiscount / Double(proposal.itemsArray.count)
+            
+            // Calculate engineering percentage
+            let engineeringPercent = proposal.totalAmount > 0 ?
+                                  (proposal.subtotalEngineering / proposal.totalAmount) * 100 : 0
+            
+            return [
+                FinancialRatioViewModel(
+                    title: "Profit Margin",
+                    value: profitMargin,
+                    targetValue: 35.0,
+                    formatter: Formatters.formatPercent,
+                    description: "Revenue remaining as profit after expenses",
+                    iconName: "chart.pie.fill"
+                ),
+                FinancialRatioViewModel(
+                    title: "Return on Investment",
+                    value: roi,
+                    targetValue: 40.0,
+                    formatter: Formatters.formatPercent,
+                    description: "Profit relative to costs",
+                    iconName: "arrow.up.right"
+                ),
+                FinancialRatioViewModel(
+                    title: "Avg. Discount",
+                    value: avgDiscount,
+                    targetValue: 15.0,
+                    formatter: Formatters.formatPercent,
+                    description: "Average discount offered",
+                    iconName: "tag.fill",
+                    valueIncreasingIsGood: false
+                ),
+                FinancialRatioViewModel(
+                    title: "Engineering %",
+                    value: engineeringPercent,
+                    targetValue: 20.0,
+                    formatter: Formatters.formatPercent,
+                    description: "Engineering as % of revenue",
+                    iconName: "wrench.and.screwdriver.fill"
+                )
+            ]
+        }
+        
+        // Financial performance comparison data
+        private var performanceComparisonData: (actual: [String: Double], target: [String: Double], descriptions: [String: String]) {
+            // For this example, we're using static targets
+            // In a real app, these would come from business targets
+            
+            let actual = [
+                "Revenue": proposal.totalAmount,
+                "Profit": proposal.grossProfit,
+                "Margin": proposal.profitMargin
+            ]
+            
+            // Example targets (could be customized per proposal)
+            let target = [
+                "Revenue": 25000.0, // Example target
+                "Profit": 8750.0,   // Example target (35% margin)
+                "Margin": 35.0      // Example target percentage
+            ]
+            
+            let descriptions = [
+                "Revenue": "Total revenue from all sources",
+                "Profit": "Gross profit after all costs",
+                "Margin": "Percentage of revenue retained as profit"
+            ]
+            
+            return (actual, target, descriptions)
+        }
+        
+        var body: some View {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // MARK: - Header Summary
+                    headerSummarySection
                     
-                    Spacer()
+                    // MARK: - Revenue Breakdown
+                    revenueBreakdownSection
                     
-                    Button(action: { showingFinancialDetails = true }) {
-                        Label("Details", systemImage: "chart.bar")
-                            .foregroundColor(.blue)
+                    // MARK: - Cost Structure
+                    costBreakdownSection
+                    
+                    // MARK: - Product Categories
+                    productCategoriesSection
+                    
+                    // MARK: - Profit Analysis
+                    profitAnalysisSection
+                    
+                    // MARK: - Financial Ratios
+                    FinancialRatioGrid(ratios: financialRatios)
+                    
+                    // MARK: - Performance Comparison
+                    let compData = performanceComparisonData
+                    FinancialComparisonSection(
+                        actualValues: compData.actual,
+                        targetValues: compData.target,
+                        descriptions: compData.descriptions
+                    )
+                    
+                    // MARK: - Discount Analysis
+                    discountAnalysisSection
+                    
+                    // MARK: - Engineering Analysis (if applicable)
+                    if !proposal.engineeringArray.isEmpty {
+                        engineeringAnalysisSection
+                    }
+                    
+                    // MARK: - Tax Breakdown (if applicable)
+                    if !proposal.taxesArray.isEmpty {
+                        taxBreakdownSection
                     }
                 }
+                .padding()
+            }
+            .navigationTitle("Financial Analysis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+        }
+        
+        // MARK: - Section Views
+        
+        private var headerSummarySection: some View {
+            VStack(spacing: 16) {
+                Text("Financial Summary")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
-                Group {
-                    SummaryRow(title: "Products Subtotal", value: proposal.subtotalProducts)
-                    SummaryRow(title: "Engineering Subtotal", value: proposal.subtotalEngineering)
-                    SummaryRow(title: "Expenses Subtotal", value: proposal.subtotalExpenses)
-                    SummaryRow(title: "Taxes", value: proposal.subtotalTaxes)
+                // Key metrics cards
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    MetricCard(
+                        title: "Total Revenue",
+                        value: Formatters.formatEuro(proposal.totalAmount),
+                        subtitle: "All revenue sources",
+                        icon: "dollarsign.circle.fill",
+                        trend: "",
+                        trendUp: true
+                    )
                     
-                    // Total with more prominent styling
-                    HStack {
-                        Text("Total")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(String(format: "%.2f", proposal.totalAmount))
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
+                    MetricCard(
+                        title: "Total Cost",
+                        value: Formatters.formatEuro(proposal.totalCost),
+                        subtitle: "Products & expenses",
+                        icon: "cart.fill",
+                        trend: "",
+                        trendUp: false
+                    )
+                    
+                    MetricCard(
+                        title: "Gross Profit",
+                        value: Formatters.formatEuro(proposal.grossProfit),
+                        subtitle: "Revenue - Costs",
+                        icon: "chart.line.uptrend.xyaxis",
+                        trend: "",
+                        trendUp: proposal.grossProfit > 0
+                    )
+                    
+                    MetricCard(
+                        title: "Profit Margin",
+                        value: Formatters.formatPercent(proposal.profitMargin),
+                        subtitle: "Profit ÷ Revenue",
+                        icon: "percent",
+                        trend: "",
+                        trendUp: proposal.profitMargin > 30
+                    )
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var revenueBreakdownSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Revenue Breakdown")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(revenueData, id: \.id) { item in
+                            SectorMark(
+                                angle: .value("Value", item.value),
+                                innerRadius: .ratio(0.5),
+                                angularInset: 1.5
+                            )
+                            .foregroundStyle(item.color)
+                            .cornerRadius(5)
+                            .annotation(position: .overlay) {
+                                Text(item.value > (proposal.totalAmount * 0.1) ?
+                                     String(format: "%.0f%%", (item.value/proposal.totalAmount)*100) : "")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .fontWeight(.bold)
+                            }
+                        }
                     }
-                    .padding(.vertical, 5)
+                    .chartLegend(position: .bottom, alignment: .center, spacing: 20)
+                    .frame(height: 240)
+                } else {
+                    // Fallback for iOS 15
+                    DoughnutChart(items: revenueData, innerRadiusFraction: 0.6)
+                        .frame(height: 240)
                     
-                    Divider().background(Color.gray.opacity(0.5))
-                    
-                    // Partner Cost Section
-                    let partnerCost = calculatePartnerCost()
-                    SummaryRow(title: "Partner Cost", value: partnerCost, titleColor: .gray, valueColor: .gray)
-                    
-                    // Total Profit
-                    let totalProfit = proposal.totalAmount - partnerCost
-                    HStack {
-                        Text("Total Profit")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(String(format: "%.2f", totalProfit))
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(totalProfit >= 0 ? .green : .red)
+                    ChartLegend(items: revenueData, columns: 2)
+                        .padding(.top, 8)
+                }
+                
+                // Revenue details
+                VStack(spacing: 8) {
+                    ForEach(revenueData, id: \.id) { item in
+                        HStack {
+                            Circle()
+                                .fill(item.color)
+                                .frame(width: 12, height: 12)
+                            Text(item.name)
+                                .font(.subheadline)
+                            
+                            Spacer()
+                            
+                            Text(Formatters.formatPercent((item.value / proposal.totalAmount) * 100))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(Formatters.formatEuro(item.value))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
                     }
-                    .padding(.vertical, 5)
                     
-                    // Profit Margin
+                    Divider()
+                    
                     HStack {
-                        Text("Profit Margin")
-                            .foregroundColor(.white)
+                        Text("Total Revenue")
+                            .font(.headline)
                         Spacer()
-                        Text(String(format: "%.1f%%", proposal.totalAmount > 0 ? (totalProfit / proposal.totalAmount) * 100 : 0))
-                            .fontWeight(.semibold)
-                            .foregroundColor(totalProfit >= 0 ? .green : .red)
+                        Text(Formatters.formatEuro(proposal.totalAmount))
+                            .font(.headline)
+                    }
+                }
+                .padding(.top, 8)
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var costBreakdownSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Cost Structure")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if costBreakdownData.isEmpty {
+                    Text("No cost data available")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                } else {
+                    if #available(iOS 16.0, *) {
+                        Chart {
+                            ForEach(costBreakdownData, id: \.id) { item in
+                                SectorMark(
+                                    angle: .value("Value", item.value),
+                                    innerRadius: .ratio(0.6),
+                                    angularInset: 1.5
+                                )
+                                .foregroundStyle(item.color)
+                                .cornerRadius(5)
+                                .annotation(position: .overlay) {
+                                    Text(item.value > (proposal.totalCost * 0.1) ?
+                                         String(format: "%.0f%%", (item.value/proposal.totalCost)*100) : "")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                        .fontWeight(.bold)
+                                }
+                            }
+                        }
+                        .chartLegend(position: .bottom, alignment: .center, spacing: 20)
+                        .frame(height: 200)
+                    } else {
+                        // Fallback for iOS 15
+                        DoughnutChart(items: costBreakdownData, innerRadiusFraction: 0.6)
+                            .frame(height: 200)
+                        
+                        ChartLegend(items: costBreakdownData, columns: 2)
+                            .padding(.top, 8)
+                    }
+                    
+                    // Cost details
+                    VStack(spacing: 8) {
+                        ForEach(costBreakdownData, id: \.id) { item in
+                            HStack {
+                                Circle()
+                                    .fill(item.color)
+                                    .frame(width: 12, height: 12)
+                                Text(item.name)
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(Formatters.formatPercent((item.value / proposal.totalCost) * 100))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(Formatters.formatEuro(item.value))
+                                    .font(.subheadline)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text("Total Cost")
+                                .font(.headline)
+                            Spacer()
+                            Text(Formatters.formatEuro(proposal.totalCost))
+                                .font(.headline)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var productCategoriesSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Product Category Performance")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if productCategoryData.isEmpty {
+                    Text("No product data available")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                } else {
+                    if #available(iOS 16.0, *) {
+                        Chart {
+                            ForEach(productCategoryData, id: \.id) { item in
+                                BarMark(
+                                    x: .value("Revenue", item.value),
+                                    y: .value("Category", item.name)
+                                )
+                                .foregroundStyle(item.color.gradient)
+                                .annotation(position: .trailing) {
+                                    Text(Formatters.formatEuro(item.value))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .frame(height: CGFloat(min(productCategoryData.count * 50, 250)))
+                        .padding(.vertical)
+                    } else {
+                        // Fallback for iOS 15
+                        HorizontalBarChart(
+                            items: productCategoryData,
+                            valueFormatter: Formatters.formatEuro
+                        )
+                        .frame(height: CGFloat(min(productCategoryData.count * 30 + 20, 200)))
+                    }
+                    
+                    Divider()
+                    
+                    Text("Category Distribution")
+                        .font(.headline)
+                        .padding(.top, 8)
+                    
+                    // Calculate the percentage distribution
+                    let totalRevenue = productCategoryData.reduce(0.0) { $0 + $1.value }
+                    
+                    LabeledBarChart(
+                        items: productCategoryData.map { item in
+                            BarChartItem(
+                                name: item.name,
+                                value: (item.value / totalRevenue) * 100,
+                                color: item.color
+                            )
+                        },
+                        valueFormatter: Formatters.formatPercent
+                    )
+                    .frame(height: CGFloat(min(productCategoryData.count * 35 + 20, 200)))
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var profitAnalysisSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Profit Analysis by Category")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if profitCategoryData.isEmpty {
+                    Text("No profit data available")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                } else {
+                    if #available(iOS 16.0, *) {
+                        Chart {
+                            ForEach(profitCategoryData, id: \.id) { item in
+                                BarMark(
+                                    x: .value("Profit", item.value),
+                                    y: .value("Category", item.name)
+                                )
+                                .foregroundStyle(item.color.gradient)
+                                .annotation(position: .trailing) {
+                                    Text(Formatters.formatEuro(item.value))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .frame(height: CGFloat(min(profitCategoryData.count * 50, 250)))
+                        .padding(.vertical)
+                    } else {
+                        // Fallback for iOS 15
+                        PositiveNegativeBarChart(
+                            items: profitCategoryData,
+                            valueFormatter: Formatters.formatEuro
+                        )
+                        .frame(height: CGFloat(min(profitCategoryData.count * 30 + 20, 200)))
+                    }
+                    
+                    Divider()
+                    
+                    // Profit margin by category details
+                    Text("Profit Margins by Category")
+                        .font(.headline)
+                        .padding(.top, 8)
+                    
+                    VStack(spacing: 8) {
+                        ForEach(profitCategoryData, id: \.id) { item in
+                            let categoryTotals = proposal.itemsArray
+                                .filter { ($0.product?.category ?? "Uncategorized") == item.name }
+                                .reduce((total: 0.0, cost: 0.0)) { result, item in
+                                    let cost = (item.product?.partnerPrice ?? 0) * item.quantity
+                                    return (result.total + item.amount, result.cost + cost)
+                                }
+                            
+                            let margin = categoryTotals.total > 0 ?
+                                       ((categoryTotals.total - categoryTotals.cost) / categoryTotals.total) * 100 : 0
+                            
+                            HStack {
+                                Text(item.name)
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(Formatters.formatPercent(margin))
+                                    .font(.subheadline)
+                                    .foregroundColor(margin > 20 ? .green : (margin > 10 ? .orange : .red))
+                                Text(Formatters.formatEuro(item.value))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(item.value >= 0 ? .green : .red)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text("Total Profit")
+                                .font(.headline)
+                            Spacer()
+                            Text(Formatters.formatEuro(proposal.grossProfit))
+                                .font(.headline)
+                                .foregroundColor(proposal.grossProfit >= 0 ? .green : .red)
+                        }
+                        
+                        HStack {
+                            Text("Overall Margin")
+                                .font(.headline)
+                            Spacer()
+                            Text(Formatters.formatPercent(proposal.profitMargin))
+                                .font(.headline)
+                                .foregroundColor(proposal.profitMargin > 30 ? .green :
+                                               (proposal.profitMargin > 15 ? .blue : .red))
+                        }
                     }
                 }
             }
             .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
         }
-        .padding(.horizontal)
+        
+        private var discountAnalysisSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Discount Analysis")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if discountAnalysisData.isEmpty {
+                    Text("No discount data available")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                } else {
+                    if #available(iOS 16.0, *) {
+                        Chart {
+                            ForEach(discountAnalysisData, id: \.id) { item in
+                                BarMark(
+                                    x: .value("Discount", item.value),
+                                    y: .value("Category", item.name)
+                                )
+                                .foregroundStyle(item.color.gradient)
+                                .annotation(position: .trailing) {
+                                    Text(Formatters.formatPercent(item.value))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .chartXAxis {
+                            AxisMarks(position: .bottom) { value in
+                                if let percentage = value.as(Double.self) {
+                                    AxisValueLabel {
+                                        Text(Formatters.formatPercent(percentage))
+                                    }
+                                }
+                                AxisGridLine()
+                            }
+                        }
+                        .frame(height: CGFloat(min(discountAnalysisData.count * 50, 250)))
+                        .padding(.vertical)
+                    } else {
+                        // Fallback for iOS 15
+                        HorizontalBarChart(
+                            items: discountAnalysisData,
+                            valueFormatter: Formatters.formatPercent
+                        )
+                        .frame(height: CGFloat(min(discountAnalysisData.count * 30 + 20, 200)))
+                    }
+                    
+                    Divider()
+                    
+                    VStack(spacing: 8) {
+                        ForEach(discountAnalysisData, id: \.id) { item in
+                            let itemsCount = proposal.itemsArray.filter {
+                                ($0.product?.category ?? "Uncategorized") == item.name
+                            }.count
+                            
+                            HStack {
+                                Text(item.name)
+                                    .font(.subheadline)
+                                    
+                                Spacer()
+                                
+                                Text("\(itemsCount) item\(itemsCount == 1 ? "" : "s")")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    
+                                Text(Formatters.formatPercent(item.value))
+                                    .font(.headline)
+                                    .foregroundColor(item.value > 20 ? .red : (item.value > 10 ? .orange : .green))
+                            }
+                        }
+                        
+                        if !proposal.itemsArray.isEmpty {
+                            Divider()
+                            
+                            let totalDiscount = proposal.itemsArray.reduce(0.0) { $0 + $1.discount }
+                            let avgDiscount = totalDiscount / Double(proposal.itemsArray.count)
+                            
+                            HStack {
+                                Text("Average Discount")
+                                    .font(.headline)
+                                Spacer()
+                                Text(Formatters.formatPercent(avgDiscount))
+                                    .font(.headline)
+                                    .foregroundColor(avgDiscount > 20 ? .red : (avgDiscount > 10 ? .orange : .green))
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var engineeringAnalysisSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Engineering Services")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                let totalDays = proposal.engineeringArray.reduce(0.0) { $0 + $1.days }
+                let avgRate = totalDays > 0 ? proposal.subtotalEngineering / totalDays : 0
+                
+                HStack {
+                    MetricCard(
+                        title: "Total Days",
+                        value: String(format: "%.1f", totalDays),
+                        subtitle: "Engineering time",
+                        icon: "clock.fill",
+                        trend: "",
+                        trendUp: true
+                    )
+                    
+                    MetricCard(
+                        title: "Avg Daily Rate",
+                        value: Formatters.formatEuro(avgRate),
+                        subtitle: "Per engineer day",
+                        icon: "eurosign.circle.fill",
+                        trend: "",
+                        trendUp: true
+                    )
+                }
+                
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(proposal.engineeringArray, id: \.id) { engineering in
+                            BarMark(
+                                x: .value("Amount", engineering.amount),
+                                y: .value("Description", engineering.desc ?? "Engineering")
+                            )
+                            .foregroundStyle(Color.green.gradient)
+                        }
+                    }
+                    .frame(height: CGFloat(min(proposal.engineeringArray.count * 40 + 30, 250)))
+                    .padding(.vertical)
+                } else {
+                    // Fallback for iOS 15
+                    VStack(spacing: 10) {
+                        ForEach(proposal.engineeringArray, id: \.id) { engineering in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(engineering.desc ?? "Engineering Service")
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 20)
+                                            .cornerRadius(4)
+                                        
+                                        let maxAmount = proposal.engineeringArray.map { $0.amount }.max() ?? 1.0
+                                        let width = geo.size.width * (engineering.amount / maxAmount)
+                                        
+                                        Rectangle()
+                                            .fill(Color.green)
+                                            .frame(width: width, height: 20)
+                                            .cornerRadius(4)
+                                        
+                                        HStack {
+                                            Spacer()
+                                            Text(Formatters.formatEuro(engineering.amount))
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .padding(.trailing, 8)
+                                        }
+                                    }
+                                }
+                                .frame(height: 20)
+                                
+                                Text("\(String(format: "%.1f", engineering.days)) days @ \(Formatters.formatEuro(engineering.rate))/day")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .frame(height: CGFloat(min(proposal.engineeringArray.count * 60 + 20, 250)))
+                }
+                
+                Divider()
+                
+                HStack {
+                    Text("Total Engineering")
+                        .font(.headline)
+                    Spacer()
+                    Text(Formatters.formatEuro(proposal.subtotalEngineering))
+                        .font(.headline)
+                }
+                
+                // Engineering as percentage of total
+                let engineeringPercentage = proposal.totalAmount > 0 ?
+                                         (proposal.subtotalEngineering / proposal.totalAmount) * 100 : 0
+                
+                HStack {
+                    Text("% of Total Revenue")
+                        .font(.subheadline)
+                    Spacer()
+                    Text(Formatters.formatPercent(engineeringPercentage))
+                        .font(.subheadline)
+                        .foregroundColor(engineeringPercentage > 30 ? .green : .blue)
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+        
+        private var taxBreakdownSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Tax Breakdown")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                // Calculate the tax base
+                let taxBase = proposal.subtotalProducts + proposal.subtotalEngineering + proposal.subtotalExpenses
+                
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        ForEach(proposal.taxesArray, id: \.id) { tax in
+                            BarMark(
+                                x: .value("Amount", tax.amount),
+                                y: .value("Name", tax.name ?? "Tax")
+                            )
+                            .foregroundStyle(Color.red.gradient)
+                        }
+                    }
+                    .frame(height: CGFloat(min(proposal.taxesArray.count * 40 + 30, 200)))
+                    .padding(.vertical)
+                } else {
+                    // Fallback for iOS 15
+                    VStack(spacing: 10) {
+                        ForEach(proposal.taxesArray, id: \.id) { tax in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tax.name ?? "Tax")
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 20)
+                                            .cornerRadius(4)
+                                        
+                                        let maxAmount = proposal.taxesArray.map { $0.amount }.max() ?? 1.0
+                                        let width = geo.size.width * (tax.amount / maxAmount)
+                                        
+                                        Rectangle()
+                                            .fill(Color.red)
+                                            .frame(width: width, height: 20)
+                                            .cornerRadius(4)
+                                        
+                                        HStack {
+                                            Spacer()
+                                            Text(Formatters.formatEuro(tax.amount))
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .padding(.trailing, 8)
+                                        }
+                                    }
+                                }
+                                .frame(height: 20)
+                                
+                                Text("Rate: \(Formatters.formatPercent(tax.rate))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .frame(height: CGFloat(min(proposal.taxesArray.count * 60 + 20, 200)))
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Tax Base")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(Formatters.formatEuro(taxBase))
+                            .font(.subheadline)
+                    }
+                    
+                    HStack {
+                        Text("Total Taxes")
+                            .font(.headline)
+                        Spacer()
+                        Text(Formatters.formatEuro(proposal.subtotalTaxes))
+                            .font(.headline)
+                    }
+                    
+                    HStack {
+                        Text("Effective Tax Rate")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(Formatters.formatPercent(taxBase > 0 ? (proposal.subtotalTaxes / taxBase) * 100 : 0))
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(.systemGray6) : Color.white)
+            .cornerRadius(15)
+        }
+    }
+
+    // Preview provider
+    struct EnhancedFinancialSummaryView_Previews: PreviewProvider {
+        static var previews: some View {
+            let context = PersistenceController.preview.container.viewContext
+            let fetchRequest: NSFetchRequest<Proposal> = Proposal.fetchRequest()
+            let proposals = try? context.fetch(fetchRequest)
+            let proposal = proposals?.first ?? Proposal(context: context)
+            
+            NavigationView {
+                EnhancedFinancialSummaryView(proposal: proposal)
+            }
+            .environment(\.managedObjectContext, context)
+        }
     }
     
     // MARK: - Task Summary Section
