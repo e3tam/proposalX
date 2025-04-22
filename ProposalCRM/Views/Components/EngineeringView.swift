@@ -22,8 +22,12 @@ struct EngineeringView: View {
     // State for saving template
     @State private var templateName = ""
     
-    // TemplateManager reference
-    @StateObject private var templateManager = TemplateManager.shared
+    // TemplateManager reference - use the shared instance from TemplateManager.swift
+    @ObservedObject private var templateManager = TemplateManager.shared
+    
+    // Preset options
+    let dayPresets: [Double] = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+    let ratePresets: [Double] = [800.0, 1000.0, 1200.0, 1500.0, 2000.0]
     
     var body: some View {
         NavigationView {
@@ -45,7 +49,8 @@ struct EngineeringView: View {
                     rate: $rate,
                     showingDayPresets: $showingDayPresets,
                     showingRatePresets: $showingRatePresets,
-                    templateManager: templateManager
+                    dayPresets: dayPresets,
+                    ratePresets: ratePresets
                 )
                 
                 // MARK: - Preview Section
@@ -271,11 +276,8 @@ struct EngineeringDetailsSection: View {
     @Binding var rate: String
     @Binding var showingDayPresets: Bool
     @Binding var showingRatePresets: Bool
-    @ObservedObject var templateManager: TemplateManager
-    
-    // Preset options
-    let dayPresets: [Double] = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
-    let ratePresets: [Double] = [800.0, 1000.0, 1200.0, 1500.0, 2000.0]
+    let dayPresets: [Double]
+    let ratePresets: [Double]
     
     var body: some View {
         Section(header: Text("ENGINEERING SERVICE")) {
@@ -293,8 +295,7 @@ struct EngineeringDetailsSection: View {
             RateSelectionView(
                 rate: $rate,
                 showingRatePresets: $showingRatePresets,
-                ratePresets: ratePresets,
-                templateManager: templateManager
+                ratePresets: ratePresets
             )
             
             // Amount (calculated)
@@ -435,7 +436,6 @@ struct RateSelectionView: View {
     @Binding var rate: String
     @Binding var showingRatePresets: Bool
     let ratePresets: [Double]
-    @ObservedObject var templateManager: TemplateManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -469,7 +469,6 @@ struct RateSelectionView: View {
         if showingRatePresets {
             RatePresetsGridView(
                 ratePresets: ratePresets,
-                templateManager: templateManager,
                 rate: $rate,
                 showingRatePresets: $showingRatePresets
             )
@@ -480,7 +479,6 @@ struct RateSelectionView: View {
 // MARK: - Rate Presets Grid View
 struct RatePresetsGridView: View {
     let ratePresets: [Double]
-    @ObservedObject var templateManager: TemplateManager
     @Binding var rate: String
     @Binding var showingRatePresets: Bool
     
@@ -509,37 +507,6 @@ struct RatePresetsGridView: View {
                     }
                 }
             }
-            
-            // Custom rates grid (from user templates)
-            if !templateManager.getSortedRateTemplates().isEmpty {
-                Text("Saved Rates")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
-                
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 100), spacing: 8)
-                ], spacing: 8) {
-                    ForEach(templateManager.getSortedRateTemplates(), id: \.id) { template in
-                        Button(action: {
-                            rate = String(format: "%.2f", template.rate)
-                            showingRatePresets = false
-                        }) {
-                            VStack(spacing: 2) {
-                                Text(Formatters.formatEuro(template.rate))
-                                    .font(.body)
-                                Text(template.name)
-                                    .font(.caption)
-                            }
-                            .padding(8)
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .background(Color.blue.opacity(0.2))
-                            .foregroundColor(.blue)
-                            .cornerRadius(8)
-                        }
-                    }
-                }
-            }
         }
         .padding(.vertical, 4)
     }
@@ -558,10 +525,22 @@ struct PreviewSection: View {
             HStack {
                 Text("PREVIEW")
                 Spacer()
-                SaveTemplateButton {
+                Button(action: {
                     // Initialize with current values
                     templateName = description
                     showingSaveTemplateDialog = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.caption)
+                        Text("Save Template")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.2))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
                 }
             }
         ) {
@@ -625,12 +604,18 @@ struct SaveTemplateDialogView: View {
                         showingSaveTemplateDialog = false
                     }
                 
-                SaveTemplateDialog(
-                    isPresented: $showingSaveTemplateDialog,
-                    title: "Save as Template",
-                    templateName: $templateName,
-                    onSave: onSave
-                ) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Dialog header
+                    HStack {
+                        Text("Save as Template")
+                            .font(.headline)
+                        Spacer()
+                        Button(action: { showingSaveTemplateDialog = false }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
                     // Dialog content
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Save the current engineering service as a template for future use:")
@@ -663,178 +648,57 @@ struct SaveTemplateDialogView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
                         
+                        // Template name field
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Template Name")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            TextField("Enter template name", text: $templateName)
+                                .padding(10)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                        }
+                        
                         // Save as default option
                         Toggle("Save as default template", isOn: .constant(false))
                             .font(.subheadline)
                     }
+                    
+                    // Dialog actions
+                    HStack {
+                        Button(action: { showingSaveTemplateDialog = false }) {
+                            Text("Cancel")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.gray.opacity(0.2))
+                                .foregroundColor(.primary)
+                                .cornerRadius(8)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            onSave()
+                            showingSaveTemplateDialog = false
+                        }) {
+                            Text("Save Template")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .disabled(templateName.isEmpty)
+                    }
                 }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(16)
+                .shadow(radius: 10)
+                .padding(.horizontal, 40)
                 .transition(.scale)
             }
         }
-    }
-}
-
-// MARK: - Save Template Button
-struct SaveTemplateButton: View {
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: "square.and.arrow.down")
-                    .font(.caption)
-                Text("Save Template")
-                    .font(.caption)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.blue.opacity(0.2))
-            .foregroundColor(.blue)
-            .cornerRadius(8)
-        }
-    }
-}
-
-// MARK: - Save Template Dialog
-struct SaveTemplateDialog<Content: View>: View {
-    @Binding var isPresented: Bool
-    let title: String
-    @Binding var templateName: String
-    let onSave: () -> Void
-    let content: () -> Content
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Dialog header
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-                Button(action: { isPresented = false }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                }
-            }
-            
-            // Dialog content
-            content()
-            
-            // Template name field
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Template Name")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                TextField("Enter template name", text: $templateName)
-                    .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-            }
-            
-            // Dialog actions
-            HStack {
-                Button(action: { isPresented = false }) {
-                    Text("Cancel")
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.primary)
-                        .cornerRadius(8)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    onSave()
-                    isPresented = false
-                }) {
-                    Text("Save Template")
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-                .disabled(templateName.isEmpty)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(radius: 10)
-        .padding(.horizontal, 40)
-    }
-}
-
-// MARK: - Template Manager
-class TemplateManager: ObservableObject {
-    static let shared = TemplateManager()
-    
-    @Published private var engineeringTemplates: [EngineeringTemplate] = []
-    @Published private var rateTemplates: [RateTemplate] = []
-    
-    // Sample data - should be loaded from UserDefaults in a real app
-    init() {
-        // Default engineering templates
-        engineeringTemplates = [
-            EngineeringTemplate(name: "Basic Installation", description: "Standard installation service", days: 1.0, rate: 1000, isDefault: true),
-            EngineeringTemplate(name: "Advanced Setup", description: "Complex system configuration", days: 2.0, rate: 1200, isDefault: true),
-            EngineeringTemplate(name: "Training Session", description: "User training for new system", days: 1.5, rate: 900, isDefault: true),
-            EngineeringTemplate(name: "System Integration", description: "Integrate with existing infrastructure", days: 3.0, rate: 1100, isDefault: true)
-        ]
-        
-        // Default rate templates
-        rateTemplates = [
-            RateTemplate(name: "Junior Engineer", rate: 800),
-            RateTemplate(name: "Senior Engineer", rate: 1200),
-            RateTemplate(name: "Expert Consultant", rate: 1500)
-        ]
-    }
-    
-    func getSortedEngineeringTemplates() -> [EngineeringTemplate] {
-        return engineeringTemplates.sorted { $0.name < $1.name }
-    }
-    
-    func getSortedRateTemplates() -> [RateTemplate] {
-        return rateTemplates.sorted { $0.rate < $1.rate }
-    }
-    
-    func addEngineeringTemplate(_ template: EngineeringTemplate) {
-        engineeringTemplates.append(template)
-        // In a real app, save to UserDefaults or other storage
-    }
-    
-    func addRateTemplate(_ template: RateTemplate) {
-        rateTemplates.append(template)
-        // In a real app, save to UserDefaults or other storage
-    }
-}
-
-// MARK: - Template Models
-struct EngineeringTemplate: Identifiable {
-    let id = UUID()
-    let name: String
-    let description: String
-    let days: Double
-    let rate: Double
-    var isDefault: Bool = false
-}
-
-struct RateTemplate: Identifiable {
-    let id = UUID()
-    let name: String
-    let rate: Double
-}
-
-// MARK: - Preview Provider
-struct EngineeringView_Previews: PreviewProvider {
-    static var previews: some View {
-        let context = PersistenceController.preview.container.viewContext
-        let proposal = Proposal(context: context)
-        proposal.id = UUID()
-        proposal.number = "PROP-2023-001"
-        
-        return EngineeringView(proposal: proposal)
-            .environment(\.managedObjectContext, context)
     }
 }
