@@ -1,5 +1,5 @@
 // ProposalDetailView.swift
-// Main view for displaying proposal details with enhanced attachment and drawing features
+// Final updated version with proper Payment Terms integration
 
 import SwiftUI
 import CoreData
@@ -12,6 +12,9 @@ struct ProposalDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject var proposal: Proposal
     @Environment(\.colorScheme) private var colorScheme
+    
+    // Reference the navigation state
+    @ObservedObject private var navigationState = NavigationState.shared
     
     // State variables for showing different sheets
     @State private var showingItemSelection = false
@@ -58,74 +61,84 @@ struct ProposalDetailView: View {
                     
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
-                        // Pass colorScheme to all section components
-                        Group {
-                            ProductsTableSection(
-                                proposal: proposal,
-                                onAdd: { showingItemSelection = true },
-                                onEdit: { item in
-                                    itemToEdit = item
-                                    showEditItemSheet = true
-                                },
-                                onDelete: { item in
-                                    itemToDelete = item
-                                    showDeleteConfirmation = true
-                                }
-                            )
-                            .id(refreshId)
-                            
-                            EngineeringTableSection(
-                                proposal: proposal,
-                                onAdd: { showingEngineeringForm = true },
-                                onEdit: { engineering in
-                                    engineeringToEdit = engineering
-                                    showEditEngineeringSheet = true
-                                },
-                                onDelete: { engineering in
-                                    deleteEngineering(engineering)
-                                }
-                            )
-                            
-                            ExpensesTableSection(
-                                proposal: proposal,
-                                onAdd: { showingExpensesForm = true },
-                                onEdit: { expense in
-                                    expenseToEdit = expense
-                                    showEditExpenseSheet = true
-                                },
-                                onDelete: { expense in
-                                    deleteExpense(expense)
-                                }
-                            )
-                            
-                            CustomTaxesTableSection(
-                                proposal: proposal,
-                                onAdd: { showingCustomTaxForm = true },
-                                onEdit: { tax in
-                                    taxToEdit = tax
-                                    showEditTaxSheet = true
-                                },
-                                onDelete: { tax in
-                                    deleteTax(tax)
-                                }
-                            )
-                            
-                            // NEW: Add Attachments Section
-                            AttachmentsSection(proposal: proposal)
-                            
-                            // NEW: Add Drawing Notes Section
-                            DrawingNotesSection(proposal: proposal)
-                            
-                            FinancialSummarySection(proposal: proposal) {
-                                showingFinancialDetails = true
+                        // Products section
+                        ProductsTableSection(
+                            proposal: proposal,
+                            onAdd: { showingItemSelection = true },
+                            onEdit: { item in
+                                itemToEdit = item
+                                showEditItemSheet = true
+                            },
+                            onDelete: { item in
+                                itemToDelete = item
+                                showDeleteConfirmation = true
                             }
-                            
-                            TaskSummarySection(proposal: proposal)
-                            
-                            ActivitySummarySection(proposal: proposal)
+                        )
+                        .id(refreshId)
+                        
+                        // Engineering section
+                        EngineeringTableSection(
+                            proposal: proposal,
+                            onAdd: { showingEngineeringForm = true },
+                            onEdit: { engineering in
+                                engineeringToEdit = engineering
+                                showEditEngineeringSheet = true
+                            },
+                            onDelete: { engineering in
+                                deleteEngineering(engineering)
+                            }
+                        )
+                        
+                        // Expenses section
+                        ExpensesTableSection(
+                            proposal: proposal,
+                            onAdd: { showingExpensesForm = true },
+                            onEdit: { expense in
+                                expenseToEdit = expense
+                                showEditExpenseSheet = true
+                            },
+                            onDelete: { expense in
+                                deleteExpense(expense)
+                            }
+                        )
+                        
+                        // Custom taxes section
+                        CustomTaxesTableSection(
+                            proposal: proposal,
+                            onAdd: { showingCustomTaxForm = true },
+                            onEdit: { tax in
+                                taxToEdit = tax
+                                showEditTaxSheet = true
+                            },
+                            onDelete: { tax in
+                                deleteTax(tax)
+                            }
+                        )
+                        
+                        // Payment Terms Section - properly integrated
+                        PaymentTermsSection(proposal: proposal)
+                            .environment(\.colorScheme, colorScheme)
+                        
+                        // Attachments Section
+                        AttachmentsSection(proposal: proposal)
+                            .environment(\.colorScheme, colorScheme)
+                        
+                        // Drawing Notes Section
+                        DrawingNotesSection(proposal: proposal)
+                            .environment(\.colorScheme, colorScheme)
+                        
+                        // Financial Summary Section
+                        FinancialSummarySection(proposal: proposal) {
+                            showingFinancialDetails = true
                         }
-                        // Apply environment modifier to all sections at once
                         .environment(\.colorScheme, colorScheme)
+                        
+                        // Tasks and Activity sections
+                        TaskSummarySection(proposal: proposal)
+                            .environment(\.colorScheme, colorScheme)
+                        
+                        ActivitySummarySection(proposal: proposal)
+                            .environment(\.colorScheme, colorScheme)
                         
                         // Notes section
                         if let notes = proposal.notes, !notes.isEmpty {
@@ -144,7 +157,17 @@ struct ProposalDetailView: View {
             ExportButtonGroup(proposal: proposal)
                 .environment(\.colorScheme, colorScheme)
         }
+        .navigationBarTitle("", displayMode: .inline)
         .navigationBarHidden(true)
+        .onAppear {
+            // Hide the sidebar when this view appears
+            navigationState.showSidebar = false
+        }
+        .onDisappear {
+            // Restore sidebar when leaving this view
+            navigationState.showSidebar = true
+        }
+        
         // SHEET PRESENTATIONS
         .sheet(isPresented: $showingItemSelection) {
             ItemSelectionView(proposal: proposal)
@@ -355,24 +378,57 @@ struct ProposalDetailView: View {
         
         do {
             try viewContext.save()
+            
+            // Update dependent calculations - direct method calls
+            // First update custom taxes
+            recalculateCustomTaxes()
+            
+            // Then update payment terms
+            recalculatePaymentTerms()
+            
         } catch {
             let nsError = error as NSError
             print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
         }
-        
-        proposal.recalculateCustomTaxes()
     }
-}
+    
+    private func recalculateCustomTaxes() {
+        // Calculate the tax base - products marked with applyCustomTax
+        let taxableItems = proposal.itemsArray.filter { $0.applyCustomTax }
+        let taxBase = taxableItems.reduce(0.0) { total, item in
+            if let product = item.product {
+                return total + (item.quantity * product.partnerPrice)
+            }
+            return total
+        }
+        
+        // Update all taxes
+        let taxes = proposal.taxesArray
+        for tax in taxes {
+            let amount = taxBase * (tax.rate / 100)
+            tax.amount = amount
+        }
+        
+        // Save changes if needed
+        if viewContext.hasChanges {
+            try? viewContext.save()
+        }
+    }
 
-// Lightweight previews to avoid build slowdowns
-struct ProposalDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            Text("Preview placeholder - Light Mode")
-                .preferredColorScheme(.light)
-            
-            Text("Preview placeholder - Dark Mode")
-                .preferredColorScheme(.dark)
+    private func recalculatePaymentTerms() {
+        // Get payment terms as an array
+        guard let termSet = proposal.paymentTerms as? Set<PaymentTerm> else { return }
+        let terms = Array(termSet)
+        
+        // Update amounts for all terms
+        for term in terms {
+            term.amount = proposal.totalAmount * (term.percentage / 100)
+        }
+        
+        // Save changes if needed
+        if viewContext.hasChanges {
+            try? viewContext.save()
         }
     }
 }
+

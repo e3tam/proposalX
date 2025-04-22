@@ -1,39 +1,34 @@
 //
-//  EditCustomerView.swift
+//  CreateCustomerView.swift
 //  ProposalCRM
 //
-//  View for editing an existing customer
+//  Created by Ali Sami Gözükırmızı on 22.04.2025.
+//
+
+
+//
+//  CreateCustomerView.swift
+//  ProposalCRM
+//
+//  View for creating a new customer
 //
 
 import SwiftUI
 import CoreData
 
-struct EditCustomerView: View {
+struct CreateCustomerView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
-    @ObservedObject var customer: Customer
     
     // Customer properties
-    @State private var name: String
-    @State private var contactName: String
-    @State private var email: String
-    @State private var phone: String
-    @State private var address: String
+    @State private var name = ""
+    @State private var contactName = ""
+    @State private var email = ""
+    @State private var phone = ""
+    @State private var address = ""
     
     // Validation state
     @State private var showingValidationAlert = false
-    
-    // Initialize with customer data
-    init(customer: Customer) {
-        self.customer = customer
-        
-        // Initialize state properties with customer values
-        _name = State(initialValue: customer.name ?? "")
-        _contactName = State(initialValue: customer.contactName ?? "")
-        _email = State(initialValue: customer.email ?? "")
-        _phone = State(initialValue: customer.phone ?? "")
-        _address = State(initialValue: customer.address ?? "")
-    }
     
     var body: some View {
         Form {
@@ -58,46 +53,19 @@ struct EditCustomerView: View {
                     .disableAutocorrection(true)
             }
             
-            // Customer statistics
-            if !customer.proposalsArray.isEmpty {
-                Section(header: Text("STATISTICS")) {
+            Section {
+                Button(action: saveCustomer) {
                     HStack {
-                        Text("Total Proposals")
                         Spacer()
-                        Text("\(customer.proposalsArray.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    let activeProposals = customer.proposalsArray.filter {
-                        $0.status == "Draft" || $0.status == "Pending" || $0.status == "Sent"
-                    }
-                    HStack {
-                        Text("Active Proposals")
+                        Text("Create Customer")
+                            .fontWeight(.semibold)
                         Spacer()
-                        Text("\(activeProposals.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    let wonProposals = customer.proposalsArray.filter { $0.status == "Won" }
-                    HStack {
-                        Text("Won Proposals")
-                        Spacer()
-                        Text("\(wonProposals.count)")
-                            .foregroundColor(.green)
-                    }
-                    
-                    // Total value of proposals
-                    let totalValue = customer.proposalsArray.reduce(0.0) { $0 + $1.totalAmount }
-                    HStack {
-                        Text("Total Value")
-                        Spacer()
-                        Text(Formatters.formatEuro(totalValue))
-                            .foregroundColor(.secondary)
                     }
                 }
+                .disabled(!isFormValid)
             }
         }
-        .navigationTitle("Edit Customer")
+        .navigationTitle("New Customer")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -108,7 +76,7 @@ struct EditCustomerView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     if isFormValid {
-                        saveChanges()
+                        saveCustomer()
                     } else {
                         showingValidationAlert = true
                     }
@@ -118,7 +86,7 @@ struct EditCustomerView: View {
         .alert(isPresented: $showingValidationAlert) {
             Alert(
                 title: Text("Missing Information"),
-                message: Text("Please enter at least the customer name."),
+                message: Text("Please enter at least the customer name to create a customer."),
                 dismissButton: .default(Text("OK"))
             )
         }
@@ -128,7 +96,9 @@ struct EditCustomerView: View {
         return !name.isEmpty
     }
     
-    private func saveChanges() {
+    private func saveCustomer() {
+        let customer = Customer(context: viewContext)
+        customer.id = UUID()
         customer.name = name
         customer.contactName = contactName.isEmpty ? nil : contactName
         customer.email = email.isEmpty ? nil : email
@@ -140,8 +110,17 @@ struct EditCustomerView: View {
             presentationMode.wrappedValue.dismiss()
         } catch {
             let nsError = error as NSError
-            print("Error updating customer: \(nsError), \(nsError.userInfo)")
+            print("Error creating customer: \(nsError), \(nsError.userInfo)")
             // Optionally show an error alert
+        }
+    }
+}
+
+struct CreateCustomerView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            CreateCustomerView()
+                .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
     }
 }

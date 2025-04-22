@@ -1,60 +1,25 @@
-// CustomerDetailView.swift
-// Shows details for a specific customer and their proposals
+// Simplified CustomerDetailView.swift
+// Focuses only on proposal navigation, without redefining components
 
 import SwiftUI
+import CoreData
 
 struct CustomerDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject var customer: Customer
-    @State private var isEditing = false
-    @State private var showingNewProposal = false
+    @EnvironmentObject private var navigationState: NavigationState
+    
+    @State private var showingEditCustomer = false
+    @State private var showingCreateProposal = false
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Customer Info Card
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text(customer.formattedName)
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        Spacer()
-                        
-                        Button(action: { isEditing = true }) {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    if let contactName = customer.contactName, !contactName.isEmpty {
-                        HStack {
-                            Label(contactName, systemImage: "person")
-                                .font(.headline)
-                        }
-                    }
-                    
-                    HStack {
-                        Label(customer.email ?? "No Email", systemImage: "envelope")
-                    }
-                    
-                    HStack {
-                        Label(customer.phone ?? "No Phone", systemImage: "phone")
-                    }
-                    
-                    HStack {
-                        Label(customer.address ?? "No Address", systemImage: "location")
-                    }
-                }
-                .padding()
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(10)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                // Use your existing CustomerInfoCard component here
+                // CustomerInfoCard(customer: customer)
                 
-                // Proposals Section
-                VStack(alignment: .leading, spacing: 10)
-                {
+                // Proposals section
+                VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text("Proposals")
                             .font(.title2)
@@ -62,80 +27,102 @@ struct CustomerDetailView: View {
                         
                         Spacer()
                         
-                        Button(action: { showingNewProposal = true }) {
-                            Label("New Proposal", systemImage: "plus")
+                        Button(action: {
+                            showingCreateProposal = true
+                        }) {
+                            Label("Add Proposal", systemImage: "plus")
+                                .foregroundColor(.blue)
                         }
                     }
+                    .padding(.horizontal)
                     
+                    // Display proposals or empty state
                     if customer.proposalsArray.isEmpty {
+                        // Use your existing empty proposals component or just a placeholder
                         Text("No proposals yet")
                             .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .padding()
                     } else {
+                        // Key part: List of proposals with proper navigation
                         ForEach(customer.proposalsArray, id: \.self) { proposal in
-                            NavigationLink(destination: ProposalDetailView(proposal: proposal)) {
-                                HStack {
-                                    VStack(alignment: .leading) {
+                            NavigationLink(
+                                destination:
+                                    ProposalDetailView(proposal: proposal)
+                                        .environmentObject(navigationState)
+                            ) {
+                                // Use your existing proposal row component or create a simple one
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
                                         Text(proposal.formattedNumber)
                                             .font(.headline)
+                                        
+                                        Spacer()
+                                        
+                                        Text(proposal.formattedStatus)
+                                            .font(.caption)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(statusColor(for: proposal.formattedStatus))
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    HStack {
                                         Text(proposal.formattedDate)
                                             .font(.subheadline)
                                             .foregroundColor(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    VStack(alignment: .trailing) {
+                                        
+                                        Spacer()
+                                        
                                         Text(proposal.formattedTotal)
-                                            .font(.headline)
-                                        Text(proposal.formattedStatus)
-                                            .font(.caption)
-                                            .padding(4)
-                                            .background(statusColor(for: proposal.formattedStatus))
-                                            .foregroundColor(.white)
-                                            .cornerRadius(4)
+                                            .font(.title3)
+                                            .fontWeight(.bold)
                                     }
                                 }
-                                .padding(.vertical, 8)
+                                .padding()
+                                .background(Color(UIColor.systemBackground))
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                .padding(.horizontal)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            
-                            Divider()
                         }
                     }
                 }
-                .padding()
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(10)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
             }
-            .padding()
+            .padding(.vertical)
         }
-        .navigationTitle("Customer Details")
-        .sheet(isPresented: $isEditing) {
-            EditCustomerView(customer: customer)
+        .navigationTitle(customer.formattedName)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingEditCustomer = true
+                }) {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
         }
-        .sheet(isPresented: $showingNewProposal) {
+        .sheet(isPresented: $showingEditCustomer) {
+            NavigationView {
+                EditCustomerView(customer: customer)
+            }
+        }
+        .sheet(isPresented: $showingCreateProposal) {
             CreateProposalView(customer: customer)
         }
     }
     
+    // Helper function for status colors
     private func statusColor(for status: String) -> Color {
         switch status {
-        case "Draft":
-            return .gray
-        case "Pending":
-            return .orange
-        case "Sent":
-            return .blue
-        case "Won":
-            return .green
-        case "Lost":
-            return .red
-        case "Expired":
-            return .purple
-        default:
-            return .gray
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        case "Expired": return .purple
+        default: return .gray
         }
     }
 }

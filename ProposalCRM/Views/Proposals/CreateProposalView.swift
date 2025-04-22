@@ -1,109 +1,149 @@
-// CreateProposalView.swift
-// Create a new proposal for a selected customer
+//
+//  CreateProposalView.swift
+//  ProposalCRM
+//
+//  View for creating a new proposal for a customer
+//
 
 import SwiftUI
+import CoreData
 
 struct CreateProposalView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
+    let customer: Customer
     
-    var customer: Customer?
-    
-    @State private var proposalNumber = ""
+    // Proposal properties
+    @State private var number = ""
     @State private var status = "Draft"
-    @State private var notes = ""
     @State private var creationDate = Date()
+    @State private var notes = ""
     
-    @State private var showingItemSelection = false
-    @State private var showingEngineeringForm = false
-    @State private var showingExpensesForm = false
-    @State private var showingCustomTaxForm = false
-    
-    @State private var proposal: Proposal?
-    
-    let statusOptions = ["Draft", "Pending", "Sent", "Won", "Lost", "Expired"]
+    // Status options
+    let statusOptions = ["Draft", "Pending", "Sent"]
     
     var body: some View {
-        Form {
-            Section(header: Text("Proposal Information")) {
-                TextField("Proposal Number", text: $proposalNumber)
+        NavigationView {
+            Form {
+                Section(header: Text("PROPOSAL DETAILS")) {
+                    // Customer information (non-editable)
+                    HStack {
+                        Text("Customer")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(customer.formattedName)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Proposal number - with auto-generation option
+                    HStack {
+                        TextField("Proposal Number", text: $number)
+                        
+                        Button(action: generateProposalNumber) {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    // Status picker
+                    Picker("Status", selection: $status) {
+                        ForEach(statusOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    
+                    // Creation date
+                    DatePicker("Date", selection: $creationDate, displayedComponents: .date)
+                }
                 
-                Picker("Status", selection: $status) {
-                    ForEach(statusOptions, id: \.self) { status in
-                        Text(status).tag(status)
+                Section(header: Text("NOTES")) {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 100)
+                }
+                
+                Section {
+                    Button(action: createProposal) {
+                        HStack {
+                            Spacer()
+                            Text("Create Proposal")
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                    }
+                    .disabled(!isFormValid)
+                }
+            }
+            .navigationTitle("New Proposal")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        presentationMode.wrappedValue.dismiss()
                     }
                 }
                 
-                DatePicker("Date", selection: $creationDate, displayedComponents: .date)
-            }
-            
-            Section(header: Text("Notes")) {
-                TextEditor(text: $notes)
-                    .frame(minHeight: 100)
-            }
-        }
-        .onAppear {
-            // Generate a proposal number if empty
-            if proposalNumber.isEmpty {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyyMMdd"
-                let dateString = dateFormatter.string(from: Date())
-                proposalNumber = "PROP-\(dateString)-001"
-            }
-            
-            // Create the proposal object
-            createProposal()
-        }
-        .navigationTitle("Create Proposal")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Save") {
-                    saveProposal()
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        if isFormValid {
+                            createProposal()
+                        }
+                    }
+                    .disabled(!isFormValid)
                 }
-                .disabled(proposalNumber.isEmpty)
+            }
+            .onAppear {
+                // Auto-generate proposal number when view appears
+                if number.isEmpty {
+                    generateProposalNumber()
+                }
             }
         }
+    }
+    
+    private var isFormValid: Bool {
+        return !number.isEmpty
+    }
+    
+    private func generateProposalNumber() {
+        // Format: PROP-YYYYMMDD-XXX (XXX is sequential number)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: Date())
+        
+        // Get count of proposals for this customer to generate sequential number
+        let count = customer.proposalsArray.count + 1
+        
+        // Generate the proposal number
+        number = "PROP-\(dateString)-\(String(format: "%03d", count))"
     }
     
     private func createProposal() {
-        let newProposal = Proposal(context: viewContext)
-        newProposal.id = UUID()
-        newProposal.number = proposalNumber
-        newProposal.creationDate = creationDate
-        newProposal.status = status
-        newProposal.customer = customer
-        newProposal.totalAmount = 0
-        newProposal.notes = notes
+        let proposal = Proposal(context: viewContext)
+        proposal.id = UUID()
+        proposal.number = number
+        proposal.status = status
+        proposal.creationDate = creationDate
+        proposal.notes = notes.isEmpty ? nil : notes
+        proposal.totalAmount = 0.0 // Initialize with zero
+        proposal.customer = customer
         
         do {
             try viewContext.save()
-            proposal = newProposal
             
-            // Log proposal creation
+            // Log activity
             ActivityLogger.logProposalCreated(
-                proposal: newProposal,
+                proposal: proposal,
                 context: viewContext
             )
+            
+            // Set default payment terms
+            proposal.setDefaultPaymentTerms()
+            try viewContext.save()
+            
+            presentationMode.wrappedValue.dismiss()
         } catch {
             let nsError = error as NSError
             print("Error creating proposal: \(nsError), \(nsError.userInfo)")
-        }
-    }
-    
-    private func saveProposal() {
-        if let createdProposal = proposal {
-            createdProposal.number = proposalNumber
-            createdProposal.creationDate = creationDate
-            createdProposal.status = status
-            createdProposal.notes = notes
-            
-            do {
-                try viewContext.save()
-                presentationMode.wrappedValue.dismiss()
-            } catch {
-                let nsError = error as NSError
-                print("Error saving proposal: \(nsError), \(nsError.userInfo)")
-            }
+            // Optionally show an error alert
         }
     }
 }
