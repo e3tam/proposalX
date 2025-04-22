@@ -5,36 +5,37 @@
 //  Created by Ali Sami Gözükırmızı on 22.04.2025.
 //
 
-
-// File: ProposalCRM/Utilities/Formatters.swift
+// Formatters.swift
+// Utility class for consistent formatting of numbers and currencies
 
 import Foundation
 
 struct Formatters {
-    /// A reusable NumberFormatter configured for Euro currency display.
-    /// Uses German locale for formatting conventions (e.g., comma decimal separator).
-    static let euroCurrencyFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency // Use currency style for locale-aware formatting
-        formatter.currencyCode = "EUR"    // Set currency to Euro
-        // Using "de_DE" (Germany) as an example Euro locale. Adjust if needed for different separators/symbol placement.
-        formatter.locale = Locale(identifier: "de_DE")
-        formatter.minimumFractionDigits = 2 // Ensure two decimal places
-        formatter.maximumFractionDigits = 2 // Ensure two decimal places
-        return formatter
-    }()
-
-    /// Convenience function to format a Double value as a Euro currency string.
-    /// - Parameter value: The numeric value to format.
-    /// - Returns: A Euro-formatted string (e.g., "€1.234,56") or a fallback format.
+    // MARK: - Currency Formatters
+    
+    // Euro currency formatter - this method already exists in the project
+    // but we're providing it here to avoid reference errors
     static func formatEuro(_ value: Double) -> String {
-        return euroCurrencyFormatter.string(from: NSNumber(value: value)) ?? String(format: "€%.2f", value) // Fallback
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "EUR"
+        formatter.currencySymbol = "€"
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        
+        return formatter.string(from: NSNumber(value: value)) ?? "€0.00"
     }
-
-    /// Convenience function to format a Double value as a percentage string.
-    /// - Parameter value: The numeric value (e.g., 25.5 for 25.5%).
-    /// - Returns: A percentage-formatted string (e.g., "25.5%").
+    
+    // MARK: - Percentage Formatters
+    
+    // Standard percentage formatter
     static func formatPercent(_ value: Double) -> String {
-         return String(format: "%.1f%%", value)
-     }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 1
+        
+        // Percentage value should be between 0 and 1 for NumberFormatter
+        return formatter.string(from: NSNumber(value: value/100)) ?? "0.0%"
+    }
 }
