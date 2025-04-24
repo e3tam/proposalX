@@ -1,13 +1,3 @@
-//
-//  GlobalActivityView.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
-// Complete fixed version of the filteredActivities property in GlobalActivityView.swift
-
 import SwiftUI
 
 struct GlobalActivityView: View {
@@ -24,82 +14,21 @@ struct GlobalActivityView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Filter options
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    FilterButton(title: "All", 
-                                isSelected: selectedActivityType == nil,
-                                action: { selectedActivityType = nil })
-                    
-                    Divider()
-                        .frame(height: 24)
-                    
-                    ForEach(activityTypes.dropFirst(), id: \.self) { type in
-                        FilterButton(title: formatActivityType(type),
-                                    isSelected: selectedActivityType == type,
-                                    action: { selectedActivityType = type })
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            }
-            .background(Color(UIColor.secondarySystemBackground))
+            ActivityFilterBar(
+                selectedType: $selectedActivityType,
+                activityTypes: activityTypes,
+                formatActivityType: formatActivityType
+            )
             
+            // Content based on filtered results
             if filteredActivities.isEmpty {
-                VStack(spacing: 20) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 50))
-                        .foregroundColor(.gray)
-                    
-                    Text("No activities found")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                    
-                    if selectedActivityType != nil {
-                        Text("Try selecting a different filter")
-                            .foregroundColor(.gray)
-                        
-                        Button("Clear Filter") {
-                            selectedActivityType = nil
-                        }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyActivityView(selectedActivityType: $selectedActivityType)
             } else {
                 // Activity list
-                List {
-                    ForEach(filteredActivities, id: \.self) { activity in
-                        NavigationLink(destination: activityDestination(for: activity)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: activity.typeIcon)
-                                        .foregroundColor(activity.typeColor)
-                                    
-                                    Text(activity.description ?? "")
-                                        .font(.headline)
-                                    
-                                    Spacer()
-                                    
-                                    Text(activity.formattedTimestamp)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                if let proposal = activity.proposal {
-                                    Text("Proposal: \(proposal.formattedNumber)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-                .searchable(text: $searchText, prompt: "Search activities")
+                ActivityListView(
+                    activities: filteredActivities,
+                    searchText: $searchText
+                )
             }
         }
         .navigationTitle("Activity History")
@@ -147,12 +76,146 @@ struct GlobalActivityView: View {
             return type
         }
     }
+}
+
+// MARK: - Helper Components
+
+// Filter bar component
+private struct ActivityFilterBar: View {
+    @Binding var selectedType: String?
+    let activityTypes: [String]
+    let formatActivityType: (String) -> String
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ActivityFilterButton(
+                    title: "All",
+                    isSelected: selectedType == nil,
+                    action: { selectedType = nil }
+                )
+                
+                Divider().frame(height: 24)
+                
+                ForEach(activityTypes.dropFirst(), id: \.self) { type in
+                    ActivityFilterButton(
+                        title: formatActivityType(type),
+                        isSelected: selectedType == type,
+                        action: { selectedType = type }
+                    )
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .background(Color(UIColor.secondarySystemBackground))
+    }
+}
+
+// Empty state view
+private struct EmptyActivityView: View {
+    @Binding var selectedActivityType: String?
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 50))
+                .foregroundColor(.gray)
+            
+            Text("No activities found")
+                .font(.title2)
+                .foregroundColor(.gray)
+            
+            if selectedActivityType != nil {
+                Text("Try selecting a different filter")
+                    .foregroundColor(.gray)
+                
+                Button("Clear Filter") {
+                    selectedActivityType = nil
+                }
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// Activity list view
+private struct ActivityListView: View {
+    let activities: [Activity]
+    @Binding var searchText: String
+    
+    var body: some View {
+        List {
+            ForEach(activities, id: \.self) { activity in
+                NavigationLink(destination: activityDestination(for: activity)) {
+                    ActivityRowComponent(activity: activity)
+                }
+            }
+        }
+        .searchable(text: $searchText, prompt: "Search activities")
+    }
     
     private func activityDestination(for activity: Activity) -> some View {
-        if let proposal = activity.proposal {
-            return AnyView(ProposalDetailView(proposal: proposal))
-        } else {
-            return AnyView(EmptyView())
+        Group {
+            if let proposal = activity.proposal {
+                ProposalDetailView(proposal: proposal)
+            } else {
+                Text("Activity details not available")
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+// Activity row component - made private to avoid name conflicts
+private struct ActivityRowComponent: View {
+    let activity: Activity
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: activity.typeIcon)
+                    .foregroundColor(activity.typeColor)
+                
+                Text(activity.desc ?? "")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text(activity.formattedTimestamp)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            if let proposal = activity.proposal {
+                Text("Proposal: \(proposal.number ?? "Unknown")")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// Filter button component - made private to avoid name conflicts
+private struct ActivityFilterButton: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.blue : Color.gray.opacity(0.2))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(8)
         }
     }
 }

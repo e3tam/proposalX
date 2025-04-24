@@ -19,81 +19,11 @@ struct CustomerDetailView: View {
                 // CustomerInfoCard(customer: customer)
                 
                 // Proposals section
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Proposals")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            showingCreateProposal = true
-                        }) {
-                            Label("Add Proposal", systemImage: "plus")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Display proposals or empty state
-                    if customer.proposalsArray.isEmpty {
-                        // Use your existing empty proposals component or just a placeholder
-                        Text("No proposals yet")
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding()
-                    } else {
-                        // Key part: List of proposals with proper navigation
-                        ForEach(customer.proposalsArray, id: \.self) { proposal in
-                            NavigationLink(
-                                destination:
-                                    ProposalDetailView(proposal: proposal)
-                                        .environmentObject(navigationState)
-                            ) {
-                                // Use your existing proposal row component or create a simple one
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text(proposal.formattedNumber)
-                                            .font(.headline)
-                                        
-                                        Spacer()
-                                        
-                                        Text(proposal.formattedStatus)
-                                            .font(.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(statusColor(for: proposal.formattedStatus))
-                                            .foregroundColor(.white)
-                                            .cornerRadius(8)
-                                    }
-                                    
-                                    HStack {
-                                        Text(proposal.formattedDate)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        
-                                        Spacer()
-                                        
-                                        Text(proposal.formattedTotal)
-                                            .font(.title3)
-                                            .fontWeight(.bold)
-                                    }
-                                }
-                                .padding()
-                                .background(Color(UIColor.systemBackground))
-                                .cornerRadius(12)
-                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                }
+                proposalsSection
             }
             .padding(.vertical)
         }
-        .navigationTitle(customer.formattedName)
+        .navigationTitle(customer.name ?? "Customer")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
@@ -113,6 +43,107 @@ struct CustomerDetailView: View {
         }
     }
     
+    // MARK: - Section Components
+    
+    private var proposalsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            proposalsSectionHeader
+            
+            if customer.proposalsArray.isEmpty {
+                emptyProposalsView
+            } else {
+                proposalsList
+            }
+        }
+    }
+    
+    private var proposalsSectionHeader: some View {
+        HStack {
+            Text("Proposals")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Spacer()
+            
+            Button(action: {
+                showingCreateProposal = true
+            }) {
+                Label("Add Proposal", systemImage: "plus")
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var emptyProposalsView: some View {
+        Text("No proposals yet")
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding()
+    }
+    
+    private var proposalsList: some View {
+        ForEach(customer.proposalsArray, id: \.self) { proposal in
+            proposalNavigationLink(for: proposal)
+        }
+    }
+    
+    // MARK: - Helper Components
+    
+    private func proposalNavigationLink(for proposal: Proposal) -> some View {
+        NavigationLink(
+            destination:
+                ProposalDetailView(proposal: proposal)
+                    .environmentObject(navigationState)
+        ) {
+            // Simple inline proposal row - replace with your existing component if needed
+            proposalRowContent(for: proposal)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func proposalRowContent(for proposal: Proposal) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(proposal.number ?? "New Proposal")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text(proposal.status ?? "Draft")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor(for: proposal.status ?? "Draft"))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+            
+            HStack {
+                if let date = proposal.creationDate {
+                    Text(dateFormatter.string(from: date))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("No date")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(currencyFormatter.string(from: NSNumber(value: proposal.totalAmount)) ?? "€0.00")
+                    .font(.title3)
+                    .fontWeight(.bold)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .padding(.horizontal)
+    }
+    
     // Helper function for status colors
     private func statusColor(for status: String) -> Color {
         switch status {
@@ -123,6 +154,37 @@ struct CustomerDetailView: View {
         case "Lost": return .red
         case "Expired": return .purple
         default: return .gray
+        }
+    }
+    
+    // Formatters
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter
+    }
+    
+    private var currencyFormatter: NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "€"
+        return formatter
+    }
+}
+
+// MARK: - Preview Provider
+struct CustomerDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        let context = PersistenceController.preview.container.viewContext
+        let customer = Customer(context: context)
+        customer.name = "Preview Customer"
+        customer.email = "customer@example.com"
+        customer.phone = "123-456-7890"
+        
+        return NavigationView {
+            CustomerDetailView(customer: customer)
+                .environmentObject(NavigationState.shared)
+                .environment(\.managedObjectContext, context)
         }
     }
 }

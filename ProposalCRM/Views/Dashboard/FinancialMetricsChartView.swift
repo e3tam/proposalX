@@ -1,11 +1,3 @@
-//
-//  FinancialMetricsChartView.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
 import SwiftUI
 import Charts
 
@@ -338,13 +330,13 @@ struct FinancialMetricsChartView: View {
         // Generate periods based on selected time range
         for i in 0..<numberOfPeriods {
             // Calculate period start and end
-            let periodOffset = selectedTimePeriod == "1 Month" ? 
+            let periodOffset = selectedTimePeriod == "1 Month" ?
                 calendar.date(byAdding: .weekOfYear, value: -i, to: now) :
                 calendar.date(byAdding: .month, value: -i, to: now)
             
             if let periodDate = periodOffset {
-                let periodName = selectedTimePeriod == "1 Month" ? 
-                    "W\(numberOfPeriods-i)" : 
+                let periodName = selectedTimePeriod == "1 Month" ?
+                    "W\(numberOfPeriods-i)" :
                     dateFormatter.string(from: periodDate)
                 
                 // Calculate metric value for this period
@@ -577,7 +569,7 @@ struct FinancialMetricsChartView: View {
         return ProductInsight(name: "Imaging System", count: 5, value: 6249.99)
     }
     
-    // Forecasting 
+    // Forecasting
     private var forecastValue: Double {
         // Simple forecast based on current trend
         if chartData.count < 2 {
@@ -626,7 +618,7 @@ struct FinancialMetricsChartView: View {
         
         if let top = wonProposals.max(by: { $0.grossProfit < $1.grossProfit }) {
             return ProfitInsight(
-                name: top.formattedNumber,
+                name: top.number ?? "New Proposal",  // Fixed: using number instead of formattedNumber
                 profit: top.grossProfit,
                 margin: top.profitMargin
             )
@@ -642,7 +634,7 @@ struct FinancialMetricsChartView: View {
         
         if let lowest = wonProposals.min(by: { $0.grossProfit < $1.grossProfit }) {
             return ProfitInsight(
-                name: lowest.formattedNumber,
+                name: lowest.number ?? "New Proposal",  // Fixed: using number instead of formattedNumber
                 profit: lowest.grossProfit,
                 margin: lowest.profitMargin
             )
@@ -672,7 +664,7 @@ struct FinancialMetricsChartView: View {
         
         if let highest = wonProposals.max(by: { $0.profitMargin < $1.profitMargin }) {
             return MarginInsight(
-                name: highest.formattedNumber,
+                name: highest.number ?? "New Proposal",  // Fixed: using number instead of formattedNumber
                 value: highest.totalAmount,
                 margin: highest.profitMargin
             )
@@ -688,7 +680,7 @@ struct FinancialMetricsChartView: View {
         
         if let lowest = wonProposals.min(by: { $0.profitMargin < $1.profitMargin }) {
             return MarginInsight(
-                name: lowest.formattedNumber,
+                name: lowest.number ?? "New Proposal",  // Fixed: using number instead of formattedNumber
                 value: lowest.totalAmount,
                 margin: lowest.profitMargin
             )
@@ -725,11 +717,11 @@ struct FinancialMetricsChartView: View {
         if let largest = wonProposals.max(by: { $0.totalAmount < $1.totalAmount }) {
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            let dateStr = largest.creationDate != nil ? 
+            let dateStr = largest.creationDate != nil ?
                 dateFormatter.string(from: largest.creationDate!) : ""
             
             return DealInsight(
-                name: largest.formattedNumber,
+                name: largest.number ?? "New Proposal",  // Fixed: using number instead of formattedNumber
                 value: largest.totalAmount,
                 date: dateStr
             )
@@ -753,8 +745,6 @@ struct FinancialMetricsChartView: View {
         return formatter
     }()
 }
-
-
 
 struct FinancialMetricsChartView_Previews: PreviewProvider {
     static var previews: some View {
