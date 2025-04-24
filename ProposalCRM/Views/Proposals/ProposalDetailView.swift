@@ -1,20 +1,16 @@
-// ProposalDetailView.swift
-// Fixed to properly use NavigationState
-
 import SwiftUI
 import CoreData
-import PDFKit
-import UIKit
-import MessageUI
-import PencilKit
 
 struct ProposalDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @ObservedObject var proposal: Proposal
-    @Environment(\.colorScheme) private var colorScheme
-    
-    // Reference the navigation state as an EnvironmentObject
     @EnvironmentObject private var navigationState: NavigationState
+    
+    // The proposal to display - using @ObservedObject instead of ID
+    @ObservedObject var proposal: Proposal
+    
+    // Simplified loading state
+    @State private var isLoading = false
+    @State private var loadingError: String? = nil
     
     // State variables for showing different sheets
     @State private var showingItemSelection = false
@@ -51,121 +47,106 @@ struct ProposalDetailView: View {
             Color(UIColor.systemBackground)
                 .edgesIgnoringSafeArea(.all)
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Pass colorScheme to header section
-                    EnhancedProposalHeaderSection(
-                        proposal: proposal,
-                        onEditTapped: { showingEditProposal = true }
-                    )
-                    
-                    // Content sections with proper spacing
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Products section
-                        ProductsTableSection(
+            if isLoading {
+                loadingView
+            } else if let error = loadingError {
+                errorView(message: error)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Header section
+                        EnhancedProposalHeaderSection(
                             proposal: proposal,
-                            onAdd: { showingItemSelection = true },
-                            onEdit: { item in
-                                itemToEdit = item
-                                showEditItemSheet = true
-                            },
-                            onDelete: { item in
-                                itemToDelete = item
-                                showDeleteConfirmation = true
-                            }
-                        )
-                        .id(refreshId)
-                        
-                        // Engineering section
-                        EngineeringTableSection(
-                            proposal: proposal,
-                            onAdd: { showingEngineeringForm = true },
-                            onEdit: { engineering in
-                                engineeringToEdit = engineering
-                                showEditEngineeringSheet = true
-                            },
-                            onDelete: { engineering in
-                                deleteEngineering(engineering)
-                            }
+                            onEditTapped: { showingEditProposal = true }
                         )
                         
-                        // Expenses section
-                        ExpensesTableSection(
-                            proposal: proposal,
-                            onAdd: { showingExpensesForm = true },
-                            onEdit: { expense in
-                                expenseToEdit = expense
-                                showEditExpenseSheet = true
-                            },
-                            onDelete: { expense in
-                                deleteExpense(expense)
+                        // Content sections
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Products section
+                            ProductsTableSection(
+                                proposal: proposal,
+                                onAdd: { showingItemSelection = true },
+                                onEdit: { item in
+                                    itemToEdit = item
+                                    showEditItemSheet = true
+                                },
+                                onDelete: { item in
+                                    itemToDelete = item
+                                    showDeleteConfirmation = true
+                                }
+                            )
+                            .id(refreshId)
+                            
+                            // Engineering section
+                            EngineeringTableSection(
+                                proposal: proposal,
+                                onAdd: { showingEngineeringForm = true },
+                                onEdit: { engineering in
+                                    engineeringToEdit = engineering
+                                    showEditEngineeringSheet = true
+                                },
+                                onDelete: { engineering in
+                                    deleteEngineering(engineering)
+                                }
+                            )
+                            
+                            // Expenses section
+                            ExpensesTableSection(
+                                proposal: proposal,
+                                onAdd: { showingExpensesForm = true },
+                                onEdit: { expense in
+                                    expenseToEdit = expense
+                                    showEditExpenseSheet = true
+                                },
+                                onDelete: { expense in
+                                    deleteExpense(expense)
+                                }
+                            )
+                            
+                            // Custom taxes section
+                            CustomTaxesTableSection(
+                                proposal: proposal,
+                                onAdd: { showingCustomTaxForm = true },
+                                onEdit: { tax in
+                                    taxToEdit = tax
+                                    showEditTaxSheet = true
+                                },
+                                onDelete: { tax in
+                                    deleteTax(tax)
+                                }
+                            )
+                            
+                            // Payment Terms Section
+                            PaymentTermsSection(proposal: proposal)
+                            
+                            // Financial Summary Section
+                            FinancialSummarySection(proposal: proposal) {
+                                showingFinancialDetails = true
                             }
-                        )
-                        
-                        // Custom taxes section
-                        CustomTaxesTableSection(
-                            proposal: proposal,
-                            onAdd: { showingCustomTaxForm = true },
-                            onEdit: { tax in
-                                taxToEdit = tax
-                                showEditTaxSheet = true
-                            },
-                            onDelete: { tax in
-                                deleteTax(tax)
+                            
+                            // Notes section if available
+                            if let notes = proposal.notes, !notes.isEmpty {
+                                NotesSection(notes: notes)
                             }
-                        )
-                        
-                        // Payment Terms Section - properly integrated
-                        PaymentTermsSection(proposal: proposal)
-                            .environment(\.colorScheme, colorScheme)
-                        
-                        // Attachments Section
-                        AttachmentsSection(proposal: proposal)
-                            .environment(\.colorScheme, colorScheme)
-                        
-                        // Drawing Notes Section
-                        DrawingNotesSection(proposal: proposal)
-                            .environment(\.colorScheme, colorScheme)
-                        
-                        // Financial Summary Section
-                        FinancialSummarySection(proposal: proposal) {
-                            showingFinancialDetails = true
+                            
+                            // Add spacing at bottom for floating button
+                            Spacer().frame(height: 80)
                         }
-                        .environment(\.colorScheme, colorScheme)
-                        
-                        // Tasks and Activity sections
-                        TaskSummarySection(proposal: proposal)
-                            .environment(\.colorScheme, colorScheme)
-                        
-                        ActivitySummarySection(proposal: proposal)
-                            .environment(\.colorScheme, colorScheme)
-                        
-                        // Notes section
-                        if let notes = proposal.notes, !notes.isEmpty {
-                            NotesSection(notes: notes)
-                                .environment(\.colorScheme, colorScheme)
-                        }
-                        
-                        // Add spacing at bottom for floating button
-                        Spacer().frame(height: 80)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.vertical, 20)
                 }
+                .refreshable {
+                    refreshProposal()
+                }
+                
+                // Floating export buttons
+                ExportButtonGroup(proposal: proposal)
             }
-            
-            // Floating export buttons
-            ExportButtonGroup(proposal: proposal)
-                .environment(\.colorScheme, colorScheme)
         }
-        .navigationBarTitle("", displayMode: .inline)
-        .navigationBarHidden(true)
+        .navigationTitle("Proposal Details")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Hide the sidebar when this view appears
-            navigationState.showSidebar = false
-        }
-        .onDisappear {
-            // Restore sidebar when leaving this view
-            navigationState.showSidebar = true
+            refreshProposal()
         }
         
         // SHEET PRESENTATIONS
@@ -228,13 +209,9 @@ struct ProposalDetailView: View {
             itemToEdit = nil
             showEditItemSheet = false
             
-            // Force complete view refresh
+            // Force view refresh
             if didSaveItemChanges {
-                // Refresh the context to ensure all relationships are fully loaded
-                viewContext.refreshAllObjects()
-                
-                // Update the UI
-                refreshId = UUID()
+                refreshProposal()
                 didSaveItemChanges = false
             }
         }) {
@@ -248,13 +225,6 @@ struct ProposalDetailView: View {
                             try viewContext.save()
                         } catch {
                             print("Error saving context: \(error)")
-                        }
-                        
-                        // Force view refresh
-                        DispatchQueue.main.async {
-                            // Refresh all objects to ensure latest data
-                            viewContext.refreshAllObjects()
-                            refreshId = UUID()
                         }
                     }
                 )
@@ -270,6 +240,82 @@ struct ProposalDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to delete this item from the proposal?")
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private var loadingView: some View {
+        VStack {
+            ProgressView("Loading proposal details...")
+                .progressViewStyle(CircularProgressViewStyle())
+                .padding()
+            Text("Please wait...")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Add a cancel button after 5 seconds
+            if isLoading {
+                Button("Cancel Loading") {
+                    isLoading = false
+                }
+                .padding(.top, 20)
+            }
+        }
+    }
+    
+    private func errorView(message: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 60))
+                .foregroundColor(.orange)
+            
+            Text("Error Loading Proposal")
+                .font(.title)
+            
+            Text(message)
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            Button("Try Again") {
+                refreshProposal()
+            }
+            .padding()
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .padding()
+    }
+    
+    // MARK: - Data Operations
+    
+    private func refreshProposal() {
+        isLoading = true
+        loadingError = nil
+        
+        // Use a short timeout to ensure the UI doesn't hang
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            do {
+                // Refresh the proposal object
+                viewContext.refresh(proposal, mergeChanges: true)
+                
+                // Access key properties to ensure they're loaded
+                _ = proposal.number
+                _ = proposal.customer?.name
+                _ = proposal.itemsArray
+                _ = proposal.engineeringArray
+                _ = proposal.expensesArray
+                _ = proposal.taxesArray
+                
+                // Update UI
+                refreshId = UUID()
+                isLoading = false
+            } catch {
+                print("Error refreshing proposal: \(error)")
+                loadingError = "There was a problem loading the proposal: \(error.localizedDescription)"
+                isLoading = false
+            }
         }
     }
     
@@ -379,13 +425,12 @@ struct ProposalDetailView: View {
         do {
             try viewContext.save()
             
-            // Update dependent calculations - direct method calls
-            // First update custom taxes
+            // Update dependent calculations
             recalculateCustomTaxes()
-            
-            // Then update payment terms
             recalculatePaymentTerms()
             
+            // Force refresh
+            refreshId = UUID()
         } catch {
             let nsError = error as NSError
             print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
@@ -416,12 +461,11 @@ struct ProposalDetailView: View {
     }
 
     private func recalculatePaymentTerms() {
-        // Get payment terms as an array
-        guard let termSet = proposal.paymentTerms as? Set<PaymentTerm> else { return }
-        let terms = Array(termSet)
+        // Get payment terms if available
+        guard let termSet = proposal.paymentTerms as? Set<PaymentTerm>, !termSet.isEmpty else { return }
         
         // Update amounts for all terms
-        for term in terms {
+        for term in termSet {
             term.amount = proposal.totalAmount * (term.percentage / 100)
         }
         
@@ -429,5 +473,25 @@ struct ProposalDetailView: View {
         if viewContext.hasChanges {
             try? viewContext.save()
         }
+    }
+}
+
+// Helper view for displaying proposal notes
+struct NotesSection: View {
+    let notes: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Notes")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text(notes)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(10)
+        }
+        .padding(.horizontal)
     }
 }

@@ -1,6 +1,3 @@
-// ProposalListView.swift
-// Refactored to avoid type-checking issues with cleaner navigation
-
 import SwiftUI
 import CoreData
 
@@ -16,41 +13,31 @@ struct ProposalListView: View {
     @State private var searchText = ""
     @State private var showingCreateProposal = false
     @State private var selectedStatus: String? = nil
+    @State private var isNavigating = false
+    @State private var selectedProposal: Proposal?
     
     let statusOptions = ["Draft", "Pending", "Sent", "Won", "Lost", "Expired"]
     
     var body: some View {
-        ZStack {
-            mainContent
-            
-            // Navigation destination as an overlay
-            if navigationState.isNavigatingToDetail,
-               let selectedProposal = navigationState.selectedProposal {
-                NavigationLink(
-                    destination: ProposalDetailView(proposal: selectedProposal)
-                        .environmentObject(navigationState),
-                    isActive: $navigationState.isNavigatingToDetail
-                ) {
-                    EmptyView()
-                }
-            }
-        }
-        .onAppear {
-            // Clear navigation state when view appears
-            navigationState.selectedProposal = nil
-            navigationState.isNavigatingToDetail = false
-        }
-    }
-    
-    // Break down into smaller components
-    private var mainContent: some View {
         VStack {
             statusFilterView
             
             if filteredProposals.isEmpty {
                 emptyStateView
             } else {
-                proposalListView
+                List {
+                    ForEach(filteredProposals, id: \.self) { proposal in
+                        // Use a Button instead of NavigationLink for more control
+                        Button(action: {
+                            selectProposal(proposal)
+                        }) {
+                            ProposalRowView(proposal: proposal)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .onDelete(perform: deleteProposals)
+                }
+                .listStyle(PlainListStyle())
             }
         }
         .searchable(text: $searchText, prompt: "Search Proposals")
@@ -65,6 +52,29 @@ struct ProposalListView: View {
         .sheet(isPresented: $showingCreateProposal) {
             CustomerSelectionForProposalView()
                 .environmentObject(navigationState)
+        }
+        // Use background navigation link that's activated programmatically
+        .background(
+            NavigationLink(
+                destination: Group {
+                    if let proposal = selectedProposal {
+                        ProposalDetailView(proposal: proposal)
+                            .environmentObject(navigationState)
+                    } else {
+                        Text("Loading...")
+                    }
+                },
+                isActive: $isNavigating
+            ) {
+                EmptyView()
+            }
+        )
+        // Listen for "go back" signals from detail view
+        .onChange(of: navigationState.shouldGoBack) { goBack in
+            if goBack {
+                isNavigating = false
+                navigationState.shouldGoBack = false
+            }
         }
     }
     
@@ -91,28 +101,6 @@ struct ProposalListView: View {
         .padding(.vertical, 8)
     }
     
-    private var proposalListView: some View {
-        List {
-            ForEach(filteredProposals, id: \.self) { proposal in
-                ProposalRowView(proposal: proposal)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // Simplified selection handling
-                        selectProposal(proposal)
-                    }
-            }
-            .onDelete(perform: deleteProposals)
-        }
-        .listStyle(PlainListStyle())
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func selectProposal(_ proposal: Proposal) {
-        navigationState.selectedProposal = proposal
-        navigationState.isNavigatingToDetail = true
-    }
-    
     private var filteredProposals: [Proposal] {
         proposals.filter { proposal in
             // Status filter
@@ -128,6 +116,17 @@ struct ProposalListView: View {
             }
             
             return true
+        }
+    }
+    
+    // Safe proposal selection with delay to prevent UI hang
+    private func selectProposal(_ proposal: Proposal) {
+        // Store only the proposal ID or objectID
+        selectedProposal = proposal
+        
+        // Add a slight delay to allow UI to complete any pending updates
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isNavigating = true
         }
     }
     
@@ -186,8 +185,7 @@ struct ProposalListView: View {
     }
 }
 
-// MARK: - Supporting Views
-
+// The supporting structs remain the same as before
 struct FilterButton: View {
     let title: String
     let isSelected: Bool
@@ -239,6 +237,7 @@ struct ProposalRowView: View {
     }
 }
 
+// Keep other supporting views unchanged
 struct DateView: View {
     let date: Date?
     

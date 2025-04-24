@@ -93,16 +93,7 @@ extension Proposal {
         }
     }
     
-    // Payment notes
-    @objc dynamic var paymentNotes: String {
-        get {
-            let value = primitiveValue(forKey: "paymentNotes") as? String
-            return value ?? ""
-        }
-        set {
-            setPrimitiveValue(newValue, forKey: "paymentNotes")
-        }
-    }
+
     
     // Format payment terms as a summary string
     var paymentTermsSummary: String {
