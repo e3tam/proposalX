@@ -18,7 +18,7 @@ struct EmailSender: UIViewControllerRepresentable {
         mailComposer.mailComposeDelegate = context.coordinator
         
         // Set up email
-        let subject = "Teklif \(proposal.formattedNumber) - \(proposal.customerName)"
+        let subject = "Teklif \(proposal.number ?? "N/A") - \(proposal.customerName)"
         mailComposer.setSubject(subject)
         mailComposer.setToRecipients(toRecipients)
         
@@ -28,7 +28,7 @@ struct EmailSender: UIViewControllerRepresentable {
         
         // Attempt to attach PDF if available
         if let pdfData = PDFGenerator.generateProposalPDF(from: proposal) {
-            let fileName = "Teklif_\(proposal.formattedNumber).pdf"
+            let fileName = "Teklif_\(proposal.number ?? "Proposal").pdf"
             mailComposer.addAttachmentData(pdfData, mimeType: "application/pdf", fileName: fileName)
         }
         
@@ -86,7 +86,7 @@ struct EmailSender: UIViewControllerRepresentable {
         </head>
         <body>
             <div class="container">
-                <h1>Teklif (Proposal) \(proposal.formattedNumber)</h1>
+                <h1>Teklif (Proposal) \(proposal.number ?? "N/A")</h1>
                 
                 <div class="section">
                     <h2>Müşteri Bilgileri (Customer Information)</h2>
@@ -146,15 +146,15 @@ struct EmailSender: UIViewControllerRepresentable {
                     <table>
                         <tr>
                             <th width="30%">Teklif Numarası (Proposal Number)</th>
-                            <td>\(proposal.formattedNumber)</td>
+                            <td>\(proposal.number ?? "N/A")</td>
                         </tr>
                         <tr>
                             <th>Tarih (Date)</th>
-                            <td>\(proposal.formattedDate)</td>
+                            <td>\(formatDate(proposal.creationDate))</td>
                         </tr>
                         <tr>
                             <th>Durum (Status)</th>
-                            <td>\(proposal.formattedStatus)</td>
+                            <td>\(proposal.status ?? "Draft")</td>
                         </tr>
                     </table>
                 </div>
@@ -417,6 +417,17 @@ struct EmailSender: UIViewControllerRepresentable {
         totalCost += proposal.subtotalExpenses
         
         return totalCost
+    }
+    
+    // Helper function to format date
+    private func formatDate(_ date: Date?) -> String {
+        guard let date = date else {
+            return "Unknown Date"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 }
 

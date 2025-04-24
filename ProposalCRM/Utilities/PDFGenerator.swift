@@ -13,7 +13,7 @@ class PDFGenerator {
         let pdfMetaData = [
             kCGPDFContextCreator: "ProposalCRM Uygulaması",
             kCGPDFContextAuthor: "Oluşturulma Tarihi: \(formatDate(Date()))",
-            kCGPDFContextTitle: "Teklif \(proposal.formattedNumber)"
+            kCGPDFContextTitle: "Teklif \(Formatters.formatProposalNumber(proposal))"
         ]
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = pdfMetaData as [String: Any]
@@ -170,7 +170,7 @@ class PDFGenerator {
         let rightColumnWidth = pageRect.width / 2 - margin
 
         // Teklif numarası
-        let proposalNumber = "Teklif No: \(proposal.formattedNumber)"
+        let proposalNumber = "Teklif No: \(Formatters.formatProposalNumber(proposal))"
         let propNumHeight = calculateTextHeight(text: proposalNumber, width: rightColumnWidth, attributes: detailAttributes)
         drawText(proposalNumber, in: CGRect(x: rightAlignX, y: yPosition, width: rightColumnWidth, height: propNumHeight), withAttributes: detailAttributes, alignment: .right)
         var currentRightY = yPosition + propNumHeight + 4
@@ -1616,8 +1616,8 @@ class PDFGenerator {
         
         // Şirket bilgileri ve sayfa numarası içeren altbilgi
         let pageText = "Sayfa \(pageNumber)"
-        let footerText = "Referans: \(proposal?.formattedNumber ?? "") | Tarih: \(formatDate(Date())) | \(pageText) | Firma Adınız © \(Calendar.current.component(.year, from: Date()))"
-        
+                let footerText = "Referans: \(proposal != nil ? Formatters.formatProposalNumber(proposal!) : "") | Tarih: \(formatDate(Date())) | \(pageText) | Firma Adınız © \(Calendar.current.component(.year, from: Date()))"
+                
         let footerHeight = calculateTextHeight(text: footerText, width: pageRect.width - 2 * margin, attributes: footerAttributes)
         let footerY = pageRect.height - margin + 10
         
