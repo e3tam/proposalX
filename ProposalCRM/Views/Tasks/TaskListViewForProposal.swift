@@ -12,9 +12,11 @@
 import SwiftUI
 
 struct TaskListViewForProposal: View {
-    @ObservedObject var proposal: Proposal
+    // Changed from @ObservedObject to regular property
+    var proposal: Proposal
     @State private var showCompletedTasks = true
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var showingAddTask = false
     
     var body: some View {
         VStack {
@@ -31,14 +33,27 @@ struct TaskListViewForProposal: View {
                 .onDelete(perform: deleteTasks)
             }
         }
-        .navigationTitle("Tasks for \(proposal.formattedNumber)")
+        // Use direct property access with fallback instead of computed property
+        .navigationTitle("Tasks for \(proposal.number ?? "Proposal")")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    NavigationLink("Add Task", destination: AddTaskView(proposal: proposal))
+                    showingAddTask = true
                 }) {
                     Label("Add Task", systemImage: "plus")
                 }
+            }
+        }
+        // Use a sheet to present the AddTaskView
+        .sheet(isPresented: $showingAddTask) {
+            NavigationView {
+                AddTaskView(proposal: proposal)
+                    .navigationTitle("Add Task")
+                    .navigationBarItems(
+                        leading: Button("Cancel") {
+                            showingAddTask = false
+                        }
+                    )
             }
         }
     }

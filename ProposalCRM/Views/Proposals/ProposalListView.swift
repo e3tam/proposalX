@@ -87,7 +87,7 @@ struct ProposalListView: View {
                             // Hide the sidebar when navigating to details
                             navigationState.showSidebar = false
                         }) {
-                            ProposalRowContent(proposal: proposal)
+                            ProposalRowView(proposal: proposal)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -95,18 +95,18 @@ struct ProposalListView: View {
                 }
                 // Use background navigation link that's triggered programmatically
                 .background(
-                    NavigationLink(
-                        destination: Group {
-                            if let proposal = navigationState.selectedProposal {
-                                ProposalDetailView(proposal: proposal)
-                                    .environmentObject(navigationState)
-                            } else {
+                    Group {
+                        if let proposal = navigationState.selectedProposal {
+                            NavigationLink(
+                                destination: ProposalDetailView(proposal: proposal)
+                                    .environmentObject(navigationState),
+                                isActive: $navigationState.isNavigatingToDetail
+                            ) {
                                 EmptyView()
                             }
-                        },
-                        isActive: $navigationState.isNavigatingToDetail
-                    ) {
-                        EmptyView()
+                        } else {
+                            EmptyView()
+                        }
                     }
                 )
             }
@@ -183,91 +183,153 @@ struct ProposalListView: View {
             return .gray
         }
     }
+    
+    // Helper function to format a relative time string
+    private func relativeTimeString(from date: Date) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Calculate the difference components
+        let components = calendar.dateComponents([.minute, .hour, .day, .weekOfMonth, .month], from: date, to: now)
+        
+        if let month = components.month, month > 0 {
+            return month == 1 ? "1 month ago" : "\(month) months ago"
+        } else if let week = components.weekOfMonth, week > 0 {
+            return week == 1 ? "1 week ago" : "\(week) weeks ago"
+        } else if let day = components.day, day > 0 {
+            return day == 1 ? "yesterday" : "\(day) days ago"
+        } else if let hour = components.hour, hour > 0 {
+            return hour == 1 ? "1 hour ago" : "\(hour) hours ago"
+        } else if let minute = components.minute, minute > 0 {
+            return minute == 1 ? "1 minute ago" : "\(minute) minutes ago"
+        } else {
+            return "just now"
+        }
+    }
 }
 
-// Proposal row content component for consistent display
-struct ProposalRowContent: View {
-    @ObservedObject var proposal: Proposal
+// Renamed from ProposalRowContent to ProposalRowView to avoid conflicts
+struct ProposalRowView: View {
+    // Changed from @ObservedObject to regular property
+    var proposal: Proposal
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(proposal.formattedNumber)
+        HStack {
+            // Left column - proposal info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(proposal.number ?? "New Proposal")
                     .font(.headline)
                 
-                Spacer()
+                Text(proposal.customer?.name ?? "No Customer")
+                    .font(.subheadline)
                 
-                // Task indicator badge
-                if proposal.pendingTasksCount > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundColor(proposal.hasOverdueTasks ? .red : .orange)
-                        
-                        Text("\(proposal.pendingTasksCount)")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(proposal.hasOverdueTasks ? Color.red.opacity(0.2) : Color.orange.opacity(0.2))
-                    )
-                    .padding(.trailing, 4)
-                }
-                
-                Text(proposal.formattedStatus)
-                    .font(.caption)
-                    .padding(4)
-                    .background(statusColor(for: proposal.formattedStatus))
-                    .foregroundColor(.white)
-                    .cornerRadius(4)
+                DateView(date: proposal.creationDate)
             }
             
-            Text(proposal.customerName)
-                .font(.subheadline)
+            Spacer()
             
-            HStack {
-                Text(proposal.formattedDate)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            // Right column - status and amount
+            VStack(alignment: .trailing, spacing: 6) {
+                StatusView(status: proposal.status ?? "Draft")
                 
-                // Last activity timestamp
-                if let lastActivity = proposal.lastActivity {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                    
-                    Text("Updated \(lastActivity.timestamp ?? Date(), style: .relative)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                TaskCountView(proposal: proposal)
                 
-                Spacer()
-                
-                Text(proposal.formattedTotal)
+                Text("€" + String(format: "%.2f", proposal.totalAmount))
                     .font(.title3)
                     .fontWeight(.bold)
             }
         }
         .padding(.vertical, 4)
     }
+}
+
+// Helper views to break down the complex UI
+struct DateView: View {
+    let date: Date?
     
-    private func statusColor(for status: String) -> Color {
+    var body: some View {
+        HStack(spacing: 4) {
+            // Date text
+            Text(formattedDate)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Dot separator
+            Text("•")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Update indicator
+            Text("Updated")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    // Format the date outside the view builder
+    private var formattedDate: String {
+        if let date = date {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return formatter.string(from: date)
+        } else {
+            return "Unknown Date"
+        }
+    }
+}
+
+struct StatusView: View {
+    let status: String
+    
+    var body: some View {
+        Text(status)
+            .font(.caption)
+            .padding(4)
+            .background(statusColor)
+            .foregroundColor(.white)
+            .cornerRadius(4)
+    }
+    
+    private var statusColor: Color {
         switch status {
-        case "Draft":
-            return .gray
-        case "Pending":
-            return .orange
-        case "Sent":
-            return .blue
-        case "Won":
-            return .green
-        case "Lost":
-            return .red
-        case "Expired":
-            return .purple
-        default:
-            return .gray
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        case "Expired": return .purple
+        default: return .gray
+        }
+    }
+}
+
+struct TaskCountView: View {
+    let proposal: Proposal
+    
+    var body: some View {
+        Group {
+            let pendingTasks = proposal.tasksArray.filter { $0.status != "Completed" }
+            if !pendingTasks.isEmpty {
+                let hasOverdue = pendingTasks.contains { $0.isOverdue }
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(hasOverdue ? .red : .orange)
+                    
+                    Text("\(pendingTasks.count)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(hasOverdue ? Color.red.opacity(0.2) : Color.orange.opacity(0.2))
+                )
+            } else {
+                Text("No tasks")
+                    .font(.caption)
+                    .foregroundColor(.clear) // Invisible, just for spacing
+            }
         }
     }
 }

@@ -16,7 +16,8 @@ import UIKit
 import MessageUI
 
 struct ExportButtonGroup: View {
-    @ObservedObject var proposal: Proposal
+    // Changed from @ObservedObject to a regular property to avoid wrapper issues
+    var proposal: Proposal
     
     // PDF Export state variables
     @State private var showingPdfPreview = false
@@ -106,11 +107,13 @@ struct ExportButtonGroup: View {
         }
         .disabled(isGeneratingPdf)
         .overlay(
-            isGeneratingPdf ?
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                .padding(.trailing, 8)
-            : nil
+            Group {
+                if isGeneratingPdf {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .padding(.trailing, 8)
+                }
+            }
         )
     }
     
@@ -143,7 +146,8 @@ struct ExportButtonGroup: View {
         // Generate PDF in background
         DispatchQueue.global(qos: .userInitiated).async {
             if let pdfData = PDFGenerator.generateProposalPDF(from: proposal) {
-                let fileName = "Proposal_\(proposal.formattedNumber)_\(Date().timeIntervalSince1970).pdf"
+                // Use direct property access with fallback instead of computed property
+                let fileName = "Proposal_\(proposal.number ?? "New")_\(Date().timeIntervalSince1970).pdf"
                 if let url = PDFGenerator.savePDF(pdfData, fileName: fileName) {
                     // Update UI on main thread
                     DispatchQueue.main.async {

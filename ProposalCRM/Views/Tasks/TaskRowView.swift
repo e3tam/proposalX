@@ -39,7 +39,8 @@ struct TaskRowView: View {
                 
                 HStack {
                     if let proposal = task.proposal {
-                        Text(proposal.formattedNumber)
+                        // Access the number property directly with a fallback
+                        Text(proposal.number ?? "New Proposal")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

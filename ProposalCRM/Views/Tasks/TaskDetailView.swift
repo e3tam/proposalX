@@ -5,10 +5,6 @@
 //  Created by Ali Sami Gözükırmızı on 19.04.2025.
 //
 
-
-// TaskDetailView.swift
-// Detailed view for a task with editing capability
-
 import SwiftUI
 import CoreData
 
@@ -52,7 +48,7 @@ struct TaskDetailView: View {
                         
                         if let proposal = task.proposal {
                             NavigationLink(destination: ProposalDetailView(proposal: proposal)) {
-                                Text("Proposal: \(proposal.formattedNumber)")
+                                Text("Proposal: \(Formatters.formatProposalNumber(proposal))")
                                     .font(.subheadline)
                                     .foregroundColor(.blue)
                             }

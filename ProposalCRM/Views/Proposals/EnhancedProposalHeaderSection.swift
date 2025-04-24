@@ -5,10 +5,6 @@
 //  Created by Ali Sami Gözükırmızı on 22.04.2025.
 //
 
-
-// EnhancedProposalHeaderSection.swift
-// Header section displaying customer and proposal information
-
 import SwiftUI
 
 struct EnhancedProposalHeaderSection: View {
@@ -53,7 +49,7 @@ struct EnhancedProposalHeaderSection: View {
                                 .foregroundColor(.blue)
                                 .frame(width: 30)
                             
-                            Text(customer.formattedName)
+                            Text(customer.name ?? "Unknown Customer")
                                 .font(.headline)
                                 .foregroundColor(primaryTextColor)
                         }
@@ -148,7 +144,7 @@ struct EnhancedProposalHeaderSection: View {
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
                         
-                        Text(proposal.formattedNumber)
+                        Text(Formatters.formatProposalNumber(proposal))
                             .font(.headline)
                             .foregroundColor(primaryTextColor)
                     }
@@ -159,7 +155,7 @@ struct EnhancedProposalHeaderSection: View {
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
                         
-                        Text(proposal.formattedDate)
+                        Text(Formatters.formatProposalDate(proposal))
                             .font(.subheadline)
                             .foregroundColor(primaryTextColor)
                     }
@@ -170,11 +166,11 @@ struct EnhancedProposalHeaderSection: View {
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
                         
-                        Text(proposal.formattedStatus)
+                        Text(Formatters.formatProposalStatus(proposal))
                             .font(.subheadline)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(statusColor(for: proposal.formattedStatus))
+                            .background(statusColor(for: proposal.status ?? "Draft"))
                             .foregroundColor(.white)
                             .cornerRadius(5)
                     }
@@ -185,7 +181,7 @@ struct EnhancedProposalHeaderSection: View {
                             .font(.subheadline)
                             .foregroundColor(secondaryTextColor)
                         
-                        Text(proposal.formattedTotal)
+                        Text(Formatters.formatProposalTotal(proposal))
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundColor(primaryTextColor)

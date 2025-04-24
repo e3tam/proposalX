@@ -5,14 +5,11 @@
 //  Created by Ali Sami Gözükırmızı on 19.04.2025.
 //
 
-
-// ProposalHeaderView.swift
-// Fixed header view for the proposal detail screen with solid background
-
 import SwiftUI
+import CoreData
 
 struct ProposalHeaderView: View {
-    @ObservedObject var proposal: Proposal
+    var proposal: Proposal
     var onEditTapped: () -> Void
     
     var body: some View {
@@ -26,17 +23,17 @@ struct ProposalHeaderView: View {
             // Content layer
             VStack(alignment: .leading, spacing: 15) {
                 HStack {
-                    Text(proposal.formattedNumber)
+                    Text(Formatters.formatProposalNumber(proposal))
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                     
                     Spacer()
                     
-                    Text(proposal.formattedStatus)
+                    Text(Formatters.formatProposalStatus(proposal))
                         .font(.subheadline)
                         .padding(6)
-                        .background(statusColor(for: proposal.formattedStatus))
+                        .background(statusColor(for: proposal.status ?? "Draft"))
                         .foregroundColor(.white)
                         .cornerRadius(4)
                 }
@@ -48,7 +45,7 @@ struct ProposalHeaderView: View {
                         Text("Customer")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text(proposal.customerName)
+                        Text(Formatters.formatCustomerName(proposal))
                             .font(.headline)
                             .foregroundColor(.white)
                     }
@@ -59,7 +56,7 @@ struct ProposalHeaderView: View {
                         Text("Date")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text(proposal.formattedDate)
+                        Text(Formatters.formatProposalDate(proposal))
                             .font(.headline)
                             .foregroundColor(.white)
                     }
@@ -72,7 +69,7 @@ struct ProposalHeaderView: View {
                     
                     Spacer()
                     
-                    Text(proposal.formattedTotal)
+                    Text(Formatters.formatProposalTotal(proposal))
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -187,5 +184,3 @@ struct ProposalTitleSection: View {
         }
     }
 }
-
-// Top section component with action callback
