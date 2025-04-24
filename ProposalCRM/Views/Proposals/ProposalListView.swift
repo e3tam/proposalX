@@ -1,5 +1,5 @@
 // ProposalListView.swift
-// Simplified with direct NavigationLinks for better sidebar selection
+// Refactored to avoid type-checking issues with cleaner navigation
 
 import SwiftUI
 import CoreData
@@ -20,51 +20,37 @@ struct ProposalListView: View {
     let statusOptions = ["Draft", "Pending", "Sent", "Won", "Lost", "Expired"]
     
     var body: some View {
-        VStack {
-            // Status filter
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    Button(action: { selectedStatus = nil }) {
-                        Text("All")
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(selectedStatus == nil ? Color.blue : Color.gray.opacity(0.2))
-                            .foregroundColor(selectedStatus == nil ? .white : .primary)
-                            .cornerRadius(20)
-                    }
-                    
-                    ForEach(statusOptions, id: \.self) { status in
-                        Button(action: { selectedStatus = status }) {
-                            Text(status)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(selectedStatus == status ? statusColor(for: status) : Color.gray.opacity(0.2))
-                                .foregroundColor(selectedStatus == status ? .white : .primary)
-                                .cornerRadius(20)
-                        }
-                    }
+        ZStack {
+            mainContent
+            
+            // Navigation destination as an overlay
+            if navigationState.isNavigatingToDetail,
+               let selectedProposal = navigationState.selectedProposal {
+                NavigationLink(
+                    destination: ProposalDetailView(proposal: selectedProposal)
+                        .environmentObject(navigationState),
+                    isActive: $navigationState.isNavigatingToDetail
+                ) {
+                    EmptyView()
                 }
-                .padding(.horizontal)
             }
-            .padding(.vertical, 8)
+        }
+        .onAppear {
+            // Clear navigation state when view appears
+            navigationState.selectedProposal = nil
+            navigationState.isNavigatingToDetail = false
+        }
+    }
+    
+    // Break down into smaller components
+    private var mainContent: some View {
+        VStack {
+            statusFilterView
             
             if filteredProposals.isEmpty {
                 emptyStateView
             } else {
-                // DIRECT NAVIGATION LINKS - Each row is a NavigationLink
-                List {
-                    ForEach(filteredProposals, id: \.self) { proposal in
-                        NavigationLink(
-                            destination: ProposalDetailView(proposal: proposal)
-                                .environmentObject(navigationState)
-                        ) {
-                            ProposalRowView(proposal: proposal)
-                        }
-                    }
-                    .onDelete(perform: deleteProposals)
-                }
-                .listStyle(PlainListStyle())
-                .id(UUID()) // Force refresh list when view appears
+                proposalListView
             }
         }
         .searchable(text: $searchText, prompt: "Search Proposals")
@@ -82,7 +68,94 @@ struct ProposalListView: View {
         }
     }
     
-    // Empty state view for when there are no proposals
+    private var statusFilterView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                FilterButton(
+                    title: "All",
+                    isSelected: selectedStatus == nil,
+                    action: { selectedStatus = nil }
+                )
+                
+                ForEach(statusOptions, id: \.self) { status in
+                    FilterButton(
+                        title: status,
+                        isSelected: selectedStatus == status,
+                        color: statusColor(for: status),
+                        action: { selectedStatus = status }
+                    )
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private var proposalListView: some View {
+        List {
+            ForEach(filteredProposals, id: \.self) { proposal in
+                ProposalRowView(proposal: proposal)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Simplified selection handling
+                        selectProposal(proposal)
+                    }
+            }
+            .onDelete(perform: deleteProposals)
+        }
+        .listStyle(PlainListStyle())
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func selectProposal(_ proposal: Proposal) {
+        navigationState.selectedProposal = proposal
+        navigationState.isNavigatingToDetail = true
+    }
+    
+    private var filteredProposals: [Proposal] {
+        proposals.filter { proposal in
+            // Status filter
+            if let status = selectedStatus, proposal.status != status {
+                return false
+            }
+            
+            // Search text filter
+            if !searchText.isEmpty {
+                let matchesNumber = proposal.number?.localizedCaseInsensitiveContains(searchText) ?? false
+                let matchesCustomer = proposal.customer?.name?.localizedCaseInsensitiveContains(searchText) ?? false
+                return matchesNumber || matchesCustomer
+            }
+            
+            return true
+        }
+    }
+    
+    private func deleteProposals(offsets: IndexSet) {
+        withAnimation {
+            offsets.map { filteredProposals[$0] }.forEach(viewContext.delete)
+            do {
+                try viewContext.save()
+            } catch {
+                print("Error deleting proposal: \(error)")
+            }
+        }
+    }
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        case "Expired": return .purple
+        default: return .gray
+        }
+    }
+    
+    // MARK: - Empty State View
+    
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             if proposals.isEmpty {
@@ -111,69 +184,28 @@ struct ProposalListView: View {
         }
         .padding()
     }
+}
+
+// MARK: - Supporting Views
+
+struct FilterButton: View {
+    let title: String
+    let isSelected: Bool
+    var color: Color = .blue
+    let action: () -> Void
     
-    private var filteredProposals: [Proposal] {
-        // Filter the proposals based on search text and selected status
-        let filtered = proposals.filter { proposal in
-            // Apply status filter if selected
-            if let status = selectedStatus, proposal.status != status {
-                return false
-            }
-            
-            // Apply search text filter if entered
-            if !searchText.isEmpty {
-                let matchesNumber = proposal.number?.localizedCaseInsensitiveContains(searchText) ?? false
-                let matchesCustomer = proposal.customer?.name?.localizedCaseInsensitiveContains(searchText) ?? false
-                
-                if !matchesNumber && !matchesCustomer {
-                    return false
-                }
-            }
-            
-            return true
-        }
-        
-        // Return the filtered results as an array
-        return Array(filtered)
-    }
-    
-    private func deleteProposals(offsets: IndexSet) {
-        withAnimation {
-            // Convert IndexSet to indices in the filtered array
-            offsets.map { filteredProposals[$0] }.forEach(viewContext.delete)
-            
-            do {
-                try viewContext.save()
-            } catch {
-                let nsError = error as NSError
-                print("Error deleting proposal: \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-    
-    private func statusColor(for status: String) -> Color {
-        switch status {
-        case "Draft":
-            return .gray
-        case "Pending":
-            return .orange
-        case "Sent":
-            return .blue
-        case "Won":
-            return .green
-        case "Lost":
-            return .red
-        case "Expired":
-            return .purple
-        default:
-            return .gray
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isSelected ? color : Color.gray.opacity(0.2))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(20)
         }
     }
 }
 
-// MARK: - Helper Views
-
-// ProposalRowView component
 struct ProposalRowView: View {
     var proposal: Proposal
     
@@ -207,30 +239,25 @@ struct ProposalRowView: View {
     }
 }
 
-// Date view helper
 struct DateView: View {
     let date: Date?
     
     var body: some View {
         HStack(spacing: 4) {
-            // Date text
             Text(formattedDate)
                 .font(.caption)
                 .foregroundColor(.secondary)
             
-            // Dot separator
             Text("•")
                 .font(.caption)
                 .foregroundColor(.secondary)
             
-            // Update indicator
             Text("Updated")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
     }
     
-    // Format the date outside the view builder
     private var formattedDate: String {
         if let date = date {
             let formatter = DateFormatter()
@@ -242,7 +269,6 @@ struct DateView: View {
     }
 }
 
-// Status view helper
 struct StatusView: View {
     let status: String
     
@@ -268,29 +294,36 @@ struct StatusView: View {
     }
 }
 
-// Task count view helper
 struct TaskCountView: View {
     let proposal: Proposal
     
     var body: some View {
         Group {
-            let pendingTasks = proposal.tasksArray.filter { $0.status != "Completed" }
-            if !pendingTasks.isEmpty {
-                let hasOverdue = pendingTasks.contains { $0.isOverdue }
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(hasOverdue ? .red : .orange)
+            if let tasks = proposal.tasks as? Set<Task>, !tasks.isEmpty {
+                let pendingTasks = tasks.filter { $0.status != "Completed" }
+                if !pendingTasks.isEmpty {
+                    let hasOverdue = pendingTasks.contains {
+                        if let dueDate = $0.dueDate {
+                            return dueDate < Date() && $0.status != "Completed"
+                        }
+                        return false
+                    }
                     
-                    Text("\(pendingTasks.count)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundColor(hasOverdue ? .red : .orange)
+                        
+                        Text("\(pendingTasks.count)")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(hasOverdue ? Color.red.opacity(0.2) : Color.orange.opacity(0.2))
+                    )
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(hasOverdue ? Color.red.opacity(0.2) : Color.orange.opacity(0.2))
-                )
             } else {
                 Text("No tasks")
                     .font(.caption)
