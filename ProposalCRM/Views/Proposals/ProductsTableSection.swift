@@ -1,6 +1,8 @@
-// Modifications for ProductsTableSection.swift
-// Maintain the same interface while improving visual consistency
+// ProductsTableSection.swift
+// Section for displaying products in proposal detail view
+
 import SwiftUI
+
 struct ProductsTableSection: View {
     let proposal: Proposal
     let onAdd: () -> Void
@@ -8,7 +10,7 @@ struct ProductsTableSection: View {
     let onDelete: (ProposalItem) -> Void
     @Environment(\.colorScheme) private var colorScheme
     
-    // Add color properties for consistency
+    // Dynamic colors based on color scheme
     private var primaryTextColor: Color {
         colorScheme == .dark ? .white : .primary
     }
@@ -39,7 +41,7 @@ struct ProductsTableSection: View {
                 }
             }
             
-            // This calls the improved ProductTableView with better alignment
+            // Product table view - now fully externalized to the ProductTableView component
             ProductTableView(
                 proposal: proposal,
                 onDelete: onDelete,

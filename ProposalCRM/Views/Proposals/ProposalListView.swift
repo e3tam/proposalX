@@ -1,5 +1,5 @@
 // ProposalListView.swift
-// Fixed to use shared NavigationState
+// Simplified with direct NavigationLinks for better sidebar selection
 
 import SwiftUI
 import CoreData
@@ -49,66 +49,22 @@ struct ProposalListView: View {
             .padding(.vertical, 8)
             
             if filteredProposals.isEmpty {
-                VStack(spacing: 20) {
-                    if proposals.isEmpty {
-                        Text("No Proposals Yet")
-                            .font(.title)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Create your first proposal to get started")
-                            .foregroundColor(.secondary)
-                        
-                        Button(action: { showingCreateProposal = true }) {
-                            Label("Create Proposal", systemImage: "plus")
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    } else {
-                        Text("No matching proposals")
-                            .font(.title)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Try changing your search or filter")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
+                emptyStateView
             } else {
-                // Fixed navigation approach
+                // DIRECT NAVIGATION LINKS - Each row is a NavigationLink
                 List {
                     ForEach(filteredProposals, id: \.self) { proposal in
-                        Button(action: {
-                            // Set the selected proposal and trigger navigation via the shared state
-                            navigationState.selectedProposal = proposal
-                            navigationState.isNavigatingToDetail = true
-                            
-                            // Hide the sidebar when navigating to details
-                            navigationState.showSidebar = false
-                        }) {
+                        NavigationLink(
+                            destination: ProposalDetailView(proposal: proposal)
+                                .environmentObject(navigationState)
+                        ) {
                             ProposalRowView(proposal: proposal)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                     .onDelete(perform: deleteProposals)
                 }
-                // Use background navigation link that's triggered programmatically
-                .background(
-                    Group {
-                        if let proposal = navigationState.selectedProposal {
-                            NavigationLink(
-                                destination: ProposalDetailView(proposal: proposal)
-                                    .environmentObject(navigationState),
-                                isActive: $navigationState.isNavigatingToDetail
-                            ) {
-                                EmptyView()
-                            }
-                        } else {
-                            EmptyView()
-                        }
-                    }
-                )
+                .listStyle(PlainListStyle())
+                .id(UUID()) // Force refresh list when view appears
             }
         }
         .searchable(text: $searchText, prompt: "Search Proposals")
@@ -124,6 +80,36 @@ struct ProposalListView: View {
             CustomerSelectionForProposalView()
                 .environmentObject(navigationState)
         }
+    }
+    
+    // Empty state view for when there are no proposals
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            if proposals.isEmpty {
+                Text("No Proposals Yet")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                
+                Text("Create your first proposal to get started")
+                    .foregroundColor(.secondary)
+                
+                Button(action: { showingCreateProposal = true }) {
+                    Label("Create Proposal", systemImage: "plus")
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+            } else {
+                Text("No matching proposals")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                
+                Text("Try changing your search or filter")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
     }
     
     private var filteredProposals: [Proposal] {
@@ -183,34 +169,12 @@ struct ProposalListView: View {
             return .gray
         }
     }
-    
-    // Helper function to format a relative time string
-    private func relativeTimeString(from date: Date) -> String {
-        let now = Date()
-        let calendar = Calendar.current
-        
-        // Calculate the difference components
-        let components = calendar.dateComponents([.minute, .hour, .day, .weekOfMonth, .month], from: date, to: now)
-        
-        if let month = components.month, month > 0 {
-            return month == 1 ? "1 month ago" : "\(month) months ago"
-        } else if let week = components.weekOfMonth, week > 0 {
-            return week == 1 ? "1 week ago" : "\(week) weeks ago"
-        } else if let day = components.day, day > 0 {
-            return day == 1 ? "yesterday" : "\(day) days ago"
-        } else if let hour = components.hour, hour > 0 {
-            return hour == 1 ? "1 hour ago" : "\(hour) hours ago"
-        } else if let minute = components.minute, minute > 0 {
-            return minute == 1 ? "1 minute ago" : "\(minute) minutes ago"
-        } else {
-            return "just now"
-        }
-    }
 }
 
-// Renamed from ProposalRowContent to ProposalRowView to avoid conflicts
+// MARK: - Helper Views
+
+// ProposalRowView component
 struct ProposalRowView: View {
-    // Changed from @ObservedObject to regular property
     var proposal: Proposal
     
     var body: some View {
@@ -243,7 +207,7 @@ struct ProposalRowView: View {
     }
 }
 
-// Helper views to break down the complex UI
+// Date view helper
 struct DateView: View {
     let date: Date?
     
@@ -278,6 +242,7 @@ struct DateView: View {
     }
 }
 
+// Status view helper
 struct StatusView: View {
     let status: String
     
@@ -303,6 +268,7 @@ struct StatusView: View {
     }
 }
 
+// Task count view helper
 struct TaskCountView: View {
     let proposal: Proposal
     

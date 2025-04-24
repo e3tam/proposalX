@@ -1,5 +1,5 @@
 // ProposalDetailView.swift
-// Final updated version with proper Payment Terms integration
+// Fixed to properly use NavigationState
 
 import SwiftUI
 import CoreData
@@ -13,8 +13,8 @@ struct ProposalDetailView: View {
     @ObservedObject var proposal: Proposal
     @Environment(\.colorScheme) private var colorScheme
     
-    // Reference the navigation state
-    @ObservedObject private var navigationState = NavigationState.shared
+    // Reference the navigation state as an EnvironmentObject
+    @EnvironmentObject private var navigationState: NavigationState
     
     // State variables for showing different sheets
     @State private var showingItemSelection = false
@@ -431,4 +431,3 @@ struct ProposalDetailView: View {
         }
     }
 }
-
