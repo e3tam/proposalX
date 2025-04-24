@@ -1,4 +1,8 @@
+// ProductTableView.swift
+// Enhanced table view for displaying proposal items with proper scrolling and multiline product names
+
 import SwiftUI
+import CoreData
 
 struct ProductTableView: View {
     @ObservedObject var proposal: Proposal
@@ -6,7 +10,7 @@ struct ProductTableView: View {
     let onEdit: (ProposalItem) -> Void
     @Environment(\.colorScheme) var colorScheme
     
-    // Color properties
+    // Color properties for consistent appearance
     private var backgroundColor: Color {
         colorScheme == .dark ? Color.black.opacity(0.1) : Color(UIColor.tertiarySystemBackground)
     }
@@ -23,9 +27,13 @@ struct ProductTableView: View {
         colorScheme == .dark ? .white : .primary
     }
     
+    private var secondaryTextColor: Color {
+        colorScheme == .dark ? .gray : .secondary
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // Preserve the original scrollable header
+            // Horizontal scrollable header
             ScrollView(.horizontal, showsIndicators: true) {
                 HStack(spacing: 0) {
                     // Fixed columns
@@ -33,7 +41,7 @@ struct ProductTableView: View {
                         Text("Product Name")
                             .font(.caption)
                             .fontWeight(.bold)
-                            .frame(width: 150, alignment: .leading)
+                            .frame(width: 200, alignment: .leading)
                             .padding(.horizontal, 5)
                         
                         Divider().frame(height: 30)
@@ -131,16 +139,13 @@ struct ProductTableView: View {
                 .padding(.vertical, 5)
                 .background(headerBackgroundColor)
                 .cornerRadius(6)
+                .foregroundColor(primaryTextColor)
             }
             
-            // Content section
             if proposal.itemsArray.isEmpty {
-                Text("No products added yet")
-                    .foregroundColor(.secondary)
-                    .padding()
-                    .frame(maxWidth: .infinity)
+                emptyProductsView
             } else {
-                // Row content using a row-level ZStack approach to keep actions visible
+                // Scrollable table content with rows
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(proposal.itemsArray, id: \.self) { item in
@@ -150,19 +155,34 @@ struct ProductTableView: View {
                                     HStack(spacing: 0) {
                                         // Fixed columns
                                         Group {
-                                            Text(item.productName)
-                                                .font(.system(size: 14))
-                                                .frame(width: 150, alignment: .leading)
-                                                .padding(.horizontal, 5)
-                                                .lineLimit(1)
+                                            // Enhanced product name with multiline support
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(item.productName)
+                                                    .font(.system(size: 14))
+                                                    .lineLimit(3)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                                    .padding(.vertical, 2)
+                                                    .frame(width: 200, alignment: .leading)
+                                                    .multilineTextAlignment(.leading)
+                                                    .foregroundColor(primaryTextColor)
+                                                    
+                                                if let code = item.product?.code, !code.isEmpty {
+                                                    Text(code)
+                                                        .font(.caption)
+                                                        .foregroundColor(secondaryTextColor)
+                                                }
+                                            }
+                                            .frame(width: 200, alignment: .leading)
+                                            .padding(.horizontal, 5)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             Text("\(Int(item.quantity))")
                                                 .font(.system(size: 14))
                                                 .frame(width: 40, alignment: .center)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                         }
                                         
                                         // Calculated columns
@@ -173,8 +193,9 @@ struct ProductTableView: View {
                                                 .font(.system(size: 14))
                                                 .frame(width: 100, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Unit list price
                                             let unitListPrice = item.product?.listPrice ?? 0
@@ -182,26 +203,28 @@ struct ProductTableView: View {
                                                 .font(.system(size: 14))
                                                 .frame(width: 100, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Multiplier
-                                            let estimatedMultiplier = unitListPrice > 0 ?
-                                                (item.unitPrice / unitListPrice) * (1 + item.discount/100) : 1.0
+                                            let estimatedMultiplier = item.multiplier
                                             Text(String(format: "%.2f", estimatedMultiplier))
                                                 .font(.system(size: 14))
                                                 .frame(width: 80, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Discount
                                             Text(String(format: "%.1f%%", item.discount))
                                                 .font(.system(size: 14))
                                                 .frame(width: 80, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Extended partner price
                                             let extPartnerPrice = unitPartnerPrice * item.quantity
@@ -209,8 +232,9 @@ struct ProductTableView: View {
                                                 .font(.system(size: 14))
                                                 .frame(width: 100, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Extended list price
                                             let extListPrice = unitListPrice * item.quantity
@@ -218,8 +242,9 @@ struct ProductTableView: View {
                                                 .font(.system(size: 14))
                                                 .frame(width: 100, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Extended customer price
                                             let extCustomerPrice = item.amount
@@ -227,8 +252,9 @@ struct ProductTableView: View {
                                                 .font(.system(size: 14))
                                                 .frame(width: 120, alignment: .trailing)
                                                 .padding(.horizontal, 5)
+                                                .foregroundColor(primaryTextColor)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Total profit
                                             let totalProfit = extCustomerPrice - extPartnerPrice
@@ -238,18 +264,18 @@ struct ProductTableView: View {
                                                 .padding(.horizontal, 5)
                                                 .foregroundColor(totalProfit >= 0 ? .green : .red)
                                             
-                                            Divider().frame(height: 30)
+                                            Divider().frame(height: 65)
                                             
                                             // Custom tax
                                             Text(item.applyCustomTax ? "Yes" : "No")
                                                 .font(.system(size: 14))
-                                                .foregroundColor(item.applyCustomTax ? .green : .gray)
+                                                .foregroundColor(item.applyCustomTax ? .green : secondaryTextColor)
                                                 .frame(width: 90, alignment: .center)
                                                 .padding(.horizontal, 5)
                                         }
                                         
                                         // Placeholder for action buttons width
-                                        Divider().frame(height: 30)
+                                        Divider().frame(height: 65)
                                         Spacer().frame(width: 100)
                                     }
                                     .padding(.vertical, 8)
@@ -275,10 +301,7 @@ struct ProductTableView: View {
                                     }
                                     .frame(width: 100, alignment: .center)
                                     .padding(.horizontal, 5)
-                                    .background(
-                                        // Background to ensure visibility
-                                        rowBackgroundColor
-                                    )
+                                    .background(rowBackgroundColor)
                                 }
                             }
                             .background(rowBackgroundColor)
@@ -286,9 +309,25 @@ struct ProductTableView: View {
                             Divider()
                                 .background(Color.gray.opacity(0.5))
                         }
+                        
+                        // Total row
+                        HStack {
+                            Spacer()
+                            Text("Total Products")
+                                .fontWeight(.bold)
+                                .foregroundColor(primaryTextColor)
+                            
+                            Text(Formatters.formatEuro(proposal.subtotalProducts))
+                                .fontWeight(.bold)
+                                .foregroundColor(primaryTextColor)
+                                .padding(.horizontal, 20)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 20)
+                        .background(headerBackgroundColor)
                     }
                 }
-                .frame(height: min(CGFloat(proposal.itemsArray.count) * 50, 400))
+                .frame(height: min(CGFloat(proposal.itemsArray.count) * 85 + 40, 400))
             }
         }
         .background(backgroundColor)
@@ -297,5 +336,14 @@ struct ProductTableView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
         )
+    }
+    
+    // Empty state view
+    private var emptyProductsView: some View {
+        Text("No products added yet")
+            .foregroundColor(secondaryTextColor)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(colorScheme == .dark ? Color.black.opacity(0.2) : Color.gray.opacity(0.1))
     }
 }
